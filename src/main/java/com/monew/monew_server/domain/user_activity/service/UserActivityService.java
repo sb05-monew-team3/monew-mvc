@@ -10,6 +10,7 @@ import com.monew.monew_server.domain.user.repository.UserRepository;
 import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
 import com.monew.monew_server.domain.user_activity.dto.UserInfoDto;
 import com.monew.monew_server.domain.user_activity.mapper.UserActivityMapper;
+import com.monew.monew_server.domain.user_activity.repository.UserActivityArticleViewRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentLikeRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityQueryRepository;
@@ -29,6 +30,7 @@ public class UserActivityService {
 	private final UserActivityQueryRepository userActivityQueryRepository;
 	private final UserActivityCommentRepository userActivityCommentRepository;
 	private final UserActivityCommentLikeRepository userActivityCommentLikeRepository;
+	private final UserActivityArticleViewRepository userActivityArticleViewRepository;
 
 	// 사용자 기본 정보 조회 (닉네임, 이메일)
 	public UserInfoDto getUserInfo(UUID userId) {
@@ -66,13 +68,20 @@ public class UserActivityService {
 			.map(cl ->cl.getComment().getContent())
 			.toList();
 
+		// 최근 본 뉴스 기사
+		List<String> articleViews = userActivityArticleViewRepository
+			.findByUserIdOrderByCreatedAtDesc(userId)
+			.stream()
+			.map(av ->av.getArticle().getTitle())
+			.toList();
+
 
 		return userActivityMapper.toDto(
 			user,
 			subscriptions,
 			comments,
 			commentLikes,
-			List.of()
+			articleViews
 			);
 	}
 

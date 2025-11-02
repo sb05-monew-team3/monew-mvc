@@ -1,4 +1,4 @@
-package com.monew.monew_server.domain.user_activity.dot;
+package com.monew.monew_server.domain.user_activity.dto;
 
 import java.time.OffsetDateTime;
 import java.util.List;
@@ -8,7 +8,6 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import lombok.Setter;
 
 @NoArgsConstructor
 @AllArgsConstructor

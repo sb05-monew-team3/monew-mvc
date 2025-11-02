@@ -1,8 +1,10 @@
 package com.monew.monew_server.domain.comment.controller;
 
 import com.monew.monew_server.domain.comment.dto.CommentDto;
-import
-        com.monew.monew_server.domain.comment.service.CommentService;
+import com.monew.monew_server.domain.comment.dto.CommentLikeDto;
+import com.monew.monew_server.domain.comment.dto.CursorPageResponse;
+import com.monew.monew_server.domain.comment.service.CommentLikeService;
+import com.monew.monew_server.domain.comment.service.CommentService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +39,8 @@ class CommentControllerTest {
     private MockMvc mockMvc;
     @MockBean
     private CommentService commentService;
+    @MockBean
+    private CommentLikeService commentLikeService;
 
 
     // 댓글 생성 테스트 (댓글 생성 성공)
@@ -129,8 +133,26 @@ class CommentControllerTest {
     }
 
 
+    /**
+     * GET /api/comments 테스트
+     *
+     * <WebMvcTest란?>
+     * - Controller 레이어만 테스트하는 슬라이스 테스트
+     * - Service는 @MockBean으로 가짜 객체 사용
+     * - 실제 DB 연결 없이 컨트롤러 로직만 검증
+     *
+     * <given-when-then 패턴>
+     * - Given: 테스트 데이터와 Mock 설정
+     * - When: 실제 HTTP 요청 실행
+     * - Then: 응답 검증
+     *
+     * <jsonPath란?>
+     * - JSON 응답의 특정 필드 값을 검증하는 도구
+     * - $.content[0].content: content 배열의 첫 번째 요소의 content 필드
+     * - $.hasNext: 최상위 hasNext 필드
+     */
     @Test
-    @DisplayName("GET /api/comments - 댓글 목록 조회 성공")
+    @DisplayName("GET /api/comments - 댓글 목록 조회 성공 (커서 페이지네이션)")
     void getComments_Success() throws Exception {
         // Given: 테스트 데이터 준비
         UUID articleId = UUID.randomUUID();
@@ -147,27 +169,45 @@ class CommentControllerTest {
                 .createdAt(Instant.now())
                 .build();
 
-        List<CommentDto> mockComments = List.of(comment1);
+        // CursorPageResponse 생성 (Swagger 명세에 맞춤)
+        CursorPageResponse<CommentDto> mockResponse = CursorPageResponse.<CommentDto>builder()
+                .content(List.of(comment1))
+                .nextCursor(null)  // 마지막 페이지
+                .nextAfter(null)
+                .size(1)
+                .totalElements(1L)
+                .hasNext(false)  // 다음 페이지 없음
+                .build();
 
-        // Service Mock 설정: "이 메서드가 호출되면 이 값을 반환하라"
-        given(commentService.getComments(any(), any(), any(),
-                any(), any(),
-                anyInt()))
-                .willReturn(mockComments);
+        // Service Mock 설정: "getComments가 호출되면 mockResponse 반환"
+        // 파라미터: articleId, orderBy, direction, cursor, after, limit, userId (총 7개)
+        given(commentService.getComments(
+                any(UUID.class),    // articleId
+                any(String.class),  // orderBy
+                any(String.class),  // direction
+                any(),              // cursor (nullable)
+                any(),              // after (nullable)
+                anyInt(),           // limit
+                any(UUID.class)     // userId
+        )).willReturn(mockResponse);
 
         // When & Then: HTTP 요청 후 응답 검증
         mockMvc.perform(get("/api/comments")
-                        .param("articleId",
-                                articleId.toString())
+                        .param("articleId", articleId.toString())
                         .param("orderBy", "createdAt")
                         .param("direction", "ASC")
                         .param("limit", "50")
-                        .header("Monew-Request-User-ID",
-                                userId.toString()))
+                        .header("Monew-Request-User-ID", userId.toString()))
                 .andDo(print())
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].content").value("첫번째 댓글입니다"))
-                                .andExpect(jsonPath("$[0].likeCount").value(5));
+                // CursorPageResponse 구조 검증
+                .andExpect(jsonPath("$.content").isArray())
+                .andExpect(jsonPath("$.content[0].content").value("첫번째 댓글입니다"))
+                .andExpect(jsonPath("$.content[0].likeCount").value(5))
+                .andExpect(jsonPath("$.content[0].likedByMe").value(false))
+                .andExpect(jsonPath("$.size").value(1))
+                .andExpect(jsonPath("$.totalElements").value(1))
+                .andExpect(jsonPath("$.hasNext").value(false));
     }
 
     @Test
@@ -196,6 +236,61 @@ class CommentControllerTest {
                         .header("Monew-Request-User-ID", userId.toString()))
                 .andDo(print())
                 .andExpect(status().isNoContent());
+    }
+
+
+    // 좋아요 테스트
+    @Test
+    @DisplayName("POST /api/comments/{commentId}/comment-likes - 좋아요 추가 성공")
+    void addLike_Success() throws Exception {
+        // Given: 테스트 데이터 준비
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+        UUID articleId = UUID.randomUUID();
+        UUID likeId = UUID.randomUUID();
+
+        // Mock 응답 데이터
+        CommentLikeDto mockResponse = CommentLikeDto.builder()
+                .id(likeId)
+                .likedBy(userId)
+                .createdAt(Instant.now())
+                .commentId(commentId)
+                .articleId(articleId)
+                .commentUserId(userId)
+                .commentUserNickname("댓글작성자")
+                .commentContent("좋은 글이네요")
+                .commentLikeCount(1L)
+                .commentCreatedAt(Instant.now())
+                .build();
+
+        // Service Mock 설정
+        given(commentLikeService.addLike(eq(commentId), eq(userId)))
+                .willReturn(mockResponse);
+
+        // When & Then: HTTP POST 요청 + 검증
+        mockMvc.perform(post("/api/comments/{commentId}/comment-likes", commentId)
+                        .header("Monew-Request-User-ID", userId.toString()))
+                .andDo(print())
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value(likeId.toString()))
+                .andExpect(jsonPath("$.likedBy").value(userId.toString()))
+                .andExpect(jsonPath("$.commentId").value(commentId.toString()))
+                .andExpect(jsonPath("$.commentLikeCount").value(1))
+                .andExpect(jsonPath("$.commentContent").value("좋은 글이네요"));
+    }
+
+    @Test
+    @DisplayName("DELETE /api/comments/{commentId}/comment-likes - 좋아요 취소 성공")
+    void removeLike_Success() throws Exception {
+        // Given: 테스트 데이터 준비
+        UUID commentId = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        // When & Then: HTTP DELETE 요청 + 검증
+        mockMvc.perform(delete("/api/comments/{commentId}/comment-likes", commentId)
+                        .header("Monew-Request-User-ID", userId.toString()))
+                .andDo(print())
+                .andExpect(status().isOk());
     }
 
 }

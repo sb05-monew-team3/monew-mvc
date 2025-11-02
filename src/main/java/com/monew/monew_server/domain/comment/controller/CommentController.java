@@ -1,7 +1,10 @@
 package com.monew.monew_server.domain.comment.controller;
 import com.monew.monew_server.domain.comment.dto.CommentDto;
+import com.monew.monew_server.domain.comment.dto.CommentLikeDto;
 import com.monew.monew_server.domain.comment.dto.CommentRegisterRequest;
 import com.monew.monew_server.domain.comment.dto.CommentUpdateRequest;
+import com.monew.monew_server.domain.comment.dto.CursorPageResponse;
+import com.monew.monew_server.domain.comment.service.CommentLikeService;
 import com.monew.monew_server.domain.comment.service.CommentService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +13,6 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
 
 
@@ -22,47 +24,39 @@ import java.util.UUID;
 public class CommentController {
 
     private final CommentService commentService;
+    private final CommentLikeService commentLikeService;
 
-    /**
-     * POST /api/comments
-     *
-     * @param request 댓글 등록 요청 정보
-     * @return 생성된 댓글 정보 (201 Created)
-     */
     @PostMapping
     public ResponseEntity<CommentDto> createComment(
             @Valid @RequestBody CommentRegisterRequest request
     ) {
         log.info("POST /api/comments - 댓글 생성 요청");
 
-        CommentDto createdComment =
-                commentService.createComment(request);
+        CommentDto createdComment = commentService.createComment(request);
 
         return ResponseEntity
                 .status(HttpStatus.CREATED)
                 .body(createdComment);
     }
 
-
-    // 기본 댓글 조회 (단순 버전 - 현재 사용 중)
     @GetMapping
-    public ResponseEntity<List<CommentDto>> getComments(
-            @RequestParam UUID articleId,
-            @RequestParam(defaultValue = "createdAt") String orderBy,
-            @RequestParam(defaultValue = "ASC") String direction,
-            @RequestParam(required = false) String cursor,
-            @RequestParam(required = false) Instant after,
-            @RequestParam(defaultValue = "50") int limit,
-            @RequestHeader("Monew-Request-User-ID") UUID userId
+    public ResponseEntity<CursorPageResponse<CommentDto>> getComments(
+        @RequestParam UUID articleId,
+        @RequestParam(defaultValue = "createdAt") String orderBy,
+        @RequestParam(defaultValue = "ASC") String direction,
+        @RequestParam(required = false) String cursor,
+        @RequestParam(required = false) Instant after,
+        @RequestParam(defaultValue = "50") int limit,
+        @RequestHeader("Monew-Request-User-ID") UUID userId
     ) {
-        log.info("GET /api/comments - articleId={}, orderBy={}, direction={}, cursor={}, limit={}",
-                articleId, orderBy, direction, cursor, limit);
+        log.info("GET /api/comments - articleId={}, orderBy={}, direction={}, cursor={}, limit={}, userId={}",
+            articleId, orderBy, direction, cursor, limit, userId);
 
-        List<CommentDto> comments = commentService.getComments(
-                articleId, orderBy, direction, cursor, after, limit
+        CursorPageResponse<CommentDto> response = commentService.getComments(
+            articleId, orderBy, direction, cursor, after, limit, userId
         );
 
-        return ResponseEntity.ok(comments);
+        return ResponseEntity.ok(response);
     }
 
     @PatchMapping("/{commentId}")
@@ -77,8 +71,6 @@ public class CommentController {
 
         return ResponseEntity.ok(updatedComment);
     }
-
-
 
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> deleteComment(
@@ -104,5 +96,27 @@ public class CommentController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{commentId}/comment-likes")
+    public ResponseEntity<CommentLikeDto> addLike(
+            @PathVariable UUID commentId,
+            @RequestHeader("Monew-Request-User-ID") UUID userId
+    ) {
+        log.info("POST /api/comments/{}/comment-likes - 좋아요 추가, userId={}", commentId, userId);
 
+        CommentLikeDto commentLike = commentLikeService.addLike(commentId, userId);
+
+        return ResponseEntity.ok(commentLike);
+    }
+
+    @DeleteMapping("/{commentId}/comment-likes")
+    public ResponseEntity<Void> removeLike(
+            @PathVariable UUID commentId,
+            @RequestHeader("Monew-Request-User-ID") UUID userId
+    ) {
+        log.info("DELETE /api/comments/{}/comment-likes - 좋아요 취소, userId={}", commentId, userId);
+
+        commentLikeService.removeLike(commentId, userId);
+
+        return ResponseEntity.ok().build();
+    }
 }

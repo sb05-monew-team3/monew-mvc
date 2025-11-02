@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
 import com.monew.monew_server.domain.user_activity.dto.UserInfoDto;
 import com.monew.monew_server.domain.user_activity.service.UserActivityService;
 
@@ -22,7 +23,8 @@ public class UserActivityController {
 
 	// 사용자 정보 조회
 	@GetMapping("/{userId}")
-	public ResponseEntity<UserInfoDto> getUserInfo(@PathVariable UUID userId) {
-		return ResponseEntity.ok(userActivityService.getUserInfo(userId));
+	public ResponseEntity<UserActivityDto> getUserActivity(@PathVariable UUID userId) {
+		UserActivityDto userActivity = userActivityService.getUserActivity(userId);
+		return ResponseEntity.ok(userActivity);
 	}
 }

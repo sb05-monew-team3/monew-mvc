@@ -52,14 +52,14 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 		if (orderBy == ArticleSortType.VIEW_COUNT) {
 			NumberExpression<Long> countExpr = getCountExpression(ArticleSortType.VIEW_COUNT);
 			primaryOrder = direction.equals("ASC") ? countExpr.asc() : countExpr.desc();
-			tieBreaker = article.publishDate.desc();
+			tieBreaker = article.publishDate.desc(); // tie-breaker는 항상 DESC
 		} else if (orderBy == ArticleSortType.COMMENT_COUNT) {
 			NumberExpression<Long> countExpr = getCountExpression(ArticleSortType.COMMENT_COUNT);
 			primaryOrder = direction.equals("ASC") ? countExpr.asc() : countExpr.desc();
-			tieBreaker = article.publishDate.desc();
+			tieBreaker = article.publishDate.desc(); // tie-breaker는 항상 DESC
 		} else {
 			primaryOrder = direction.equals("ASC") ? article.publishDate.asc() : article.publishDate.desc();
-			tieBreaker = direction.equals("ASC") ? article.id.asc() : article.id.desc();
+			tieBreaker = article.publishDate.desc(); // tie-breaker는 항상 DESC
 		}
 
 		query.orderBy(primaryOrder, tieBreaker);
@@ -118,43 +118,55 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 	}
 
 	private BooleanExpression whereCursor(ArticleRequest request, ArticleSortType orderBy, String direction) {
+		// cursor와 after 둘 다 있어야 커서 페이지네이션 적용
 		if (request.cursor() == null || request.cursor().isBlank() || request.after() == null) {
 			return null;
 		}
 
-		UUID cursorId = UUID.fromString(request.cursor());
 		LocalDateTime after = request.after();
 		Instant afterInstant = after.toInstant(ZoneOffset.UTC);
 
-		BooleanExpression primarySort;
-		BooleanExpression tieBreaker;
+		// tie-breaker: publishDate < after (항상 DESC)
+		BooleanExpression tieBreaker = article.publishDate.lt(afterInstant);
 
 		if (orderBy == ArticleSortType.DATE) {
-			if (direction.equals("ASC")) {
-				primarySort = article.publishDate.gt(afterInstant);
-				tieBreaker = article.publishDate.eq(afterInstant).and(article.id.gt(cursorId));
-			} else {
-				primarySort = article.publishDate.lt(afterInstant);
-				tieBreaker = article.publishDate.eq(afterInstant).and(article.id.lt(cursorId));
-			}
-			return primarySort.or(tieBreaker);
-		} else {
-			Long afterValue = 0L;
+			// DATE 정렬: cursor는 publishDate 값 (Instant 문자열)
+			Instant cursorInstant;
 			try {
-				afterValue = Long.parseLong(after.toString());
-			} catch (NumberFormatException ignored) {
+				cursorInstant = Instant.parse(request.cursor());
+			} catch (Exception e) {
+				throw new IllegalArgumentException("invalid cursor for DATE sort: " + request.cursor());
+			}
+
+			if (direction.equals("ASC")) {
+				// publishDate > cursor OR (publishDate = cursor AND publishDate < after)
+				return article.publishDate.gt(cursorInstant)
+					.or(article.publishDate.eq(cursorInstant).and(tieBreaker));
+			} else {
+				// publishDate < cursor OR (publishDate = cursor AND publishDate < after)
+				return article.publishDate.lt(cursorInstant)
+					.or(article.publishDate.eq(cursorInstant).and(tieBreaker));
+			}
+		} else {
+			// COMMENT_COUNT, VIEW_COUNT 정렬: cursor는 count 값
+			long cursorCount;
+			try {
+				cursorCount = Long.parseLong(request.cursor());
+			} catch (NumberFormatException e) {
+				throw new IllegalArgumentException("invalid cursor for count sort: " + request.cursor());
 			}
 
 			NumberExpression<Long> countExpr = getCountExpression(orderBy);
 
 			if (direction.equals("ASC")) {
-				primarySort = countExpr.gt(afterValue);
-				tieBreaker = countExpr.eq(afterValue).and(article.id.gt(cursorId));
+				// count > cursor OR (count = cursor AND publishDate < after)
+				return countExpr.gt(cursorCount)
+					.or(countExpr.eq(cursorCount).and(tieBreaker));
 			} else {
-				primarySort = countExpr.lt(afterValue);
-				tieBreaker = countExpr.eq(afterValue).and(article.id.lt(cursorId));
+				// count < cursor OR (count = cursor AND publishDate < after)
+				return countExpr.lt(cursorCount)
+					.or(countExpr.eq(cursorCount).and(tieBreaker));
 			}
-			return primarySort.or(tieBreaker);
 		}
 	}
 

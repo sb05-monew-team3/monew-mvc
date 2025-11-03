@@ -17,9 +17,6 @@ import com.monew.monew_server.domain.user_activity.dto.UserInfoDto;
 @Mapper(componentModel = "spring")
 public interface UserActivityMapper {
 
-	// 불필요
-	// UserActivityMapper INSTANCE = Mappers.getMapper(UserActivityMapper.class);
-
 	@Mapping(target = "id", source = "user.id")
 	@Mapping(target = "email", source = "user.email")
 	@Mapping(target = "nickname", source = "user.nickname")

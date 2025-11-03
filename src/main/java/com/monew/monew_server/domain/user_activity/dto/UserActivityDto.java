@@ -4,6 +4,8 @@ import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
+
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -13,6 +15,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Getter
 @Builder
+@JsonPropertyOrder({
+	"id", "email", "nickname", "createdAt",
+	"subscriptions", "comments", "commentLikes", "articleViews"
+})
 public class UserActivityDto {
 
 	private UUID id;

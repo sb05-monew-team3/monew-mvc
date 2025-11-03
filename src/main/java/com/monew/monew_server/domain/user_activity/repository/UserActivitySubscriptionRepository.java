@@ -12,7 +12,6 @@ import com.monew.monew_server.domain.interest.entity.Subscription;
 @Repository
 public interface UserActivitySubscriptionRepository extends JpaRepository<Subscription, UUID> {
 	// 사용자별 구독 중인 관심사 (최근 10개)
-
 	@EntityGraph(attributePaths = {"interest"})
 	List<Subscription> findTop10ByUser_IdOrderByCreatedAtDesc(UUID userId);
 

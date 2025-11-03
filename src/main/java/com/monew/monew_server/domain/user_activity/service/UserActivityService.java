@@ -66,7 +66,6 @@ public class UserActivityService {
 
 	/**
 	 * 사용자 전체 활동 조회
-	 * (구독 -> 댓글 -> 좋아요 -> 기사 조회 순
 	 */
 
 	@Transactional(readOnly = true)

@@ -13,7 +13,6 @@ import com.monew.monew_server.domain.user_activity.mapper.UserActivityMapper;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityArticleViewRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentLikeRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentRepository;
-import com.monew.monew_server.domain.user_activity.repository.UserActivityQueryRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivitySubscriptionRepository;
 import com.monew.monew_server.exception.ErrorCode;
 import com.monew.monew_server.exception.NotFoundException;
@@ -27,7 +26,6 @@ public class UserActivityService {
 	private final UserRepository userRepository;
 	private final UserActivityMapper userActivityMapper;
 	private final UserActivitySubscriptionRepository userActivitySubscriptionRepository;
-	private final UserActivityQueryRepository userActivityQueryRepository;
 	private final UserActivityCommentRepository userActivityCommentRepository;
 	private final UserActivityCommentLikeRepository userActivityCommentLikeRepository;
 	private final UserActivityArticleViewRepository userActivityArticleViewRepository;

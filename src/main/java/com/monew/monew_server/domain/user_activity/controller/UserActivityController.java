@@ -9,7 +9,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
-import com.monew.monew_server.domain.user_activity.dto.UserInfoDto;
 import com.monew.monew_server.domain.user_activity.service.UserActivityService;
 
 import lombok.RequiredArgsConstructor;

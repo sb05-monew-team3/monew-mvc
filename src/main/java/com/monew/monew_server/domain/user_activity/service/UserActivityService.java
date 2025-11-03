@@ -1,16 +1,23 @@
 package com.monew.monew_server.domain.user_activity.service;
 
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.monew.monew_server.domain.interest.entity.InterestKeyword;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
+import com.monew.monew_server.domain.user_activity.dto.ArticleViewSummaryDto;
+import com.monew.monew_server.domain.user_activity.dto.CommentLikeSummaryDto;
+import com.monew.monew_server.domain.user_activity.dto.CommentSummaryDto;
+import com.monew.monew_server.domain.user_activity.dto.SubscriptionSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
 import com.monew.monew_server.domain.user_activity.dto.UserInfoDto;
 import com.monew.monew_server.domain.user_activity.mapper.UserActivityMapper;
+import com.monew.monew_server.domain.user_activity.repository.InterestKeywordRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityArticleViewRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentLikeRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentRepository;
@@ -32,6 +39,9 @@ public class UserActivityService {
 	private final UserActivityCommentRepository userActivityCommentRepository;
 	private final UserActivityCommentLikeRepository userActivityCommentLikeRepository;
 	private final UserActivityArticleViewRepository userActivityArticleViewRepository;
+
+	//추가
+	private final InterestKeywordRepository interestKeywordRepository;
 
 	/*
 	 * 사용자 기본 정보 조회
@@ -68,35 +78,87 @@ public class UserActivityService {
 			});
 
 		// 구독 중인 관심사 10개 조회
-		List<String> subscriptions = userActivitySubscriptionRepository
+		List<SubscriptionSummaryDto> subscriptions = userActivitySubscriptionRepository
 			.findTop10ByUser_IdOrderByCreatedAtDesc(userId)
 			.stream()
-			.map(s -> s.getInterest().getName())
+			.map(s -> {
+				UUID interestId = s.getInterest().getId();
+
+				// 🔹 InterestKeyword 테이블에서 키워드 조회
+				List<String> keywords = interestKeywordRepository.findByInterest_Id(interestId)
+					.stream()
+					.map(InterestKeyword::getName)
+					.toList();
+
+				// 🔹 Subscription 테이블에서 구독자 수 계산
+				long subscriberCount = userActivitySubscriptionRepository.countByInterest_Id(interestId);
+
+				return SubscriptionSummaryDto.builder()
+					.id(s.getId())
+					.interestId(interestId)
+					.interestName(s.getInterest().getName())
+					.interestKeywords(keywords)
+					.interestSubscriberCount(subscriberCount)
+					.createdAt(s.getCreatedAt().atOffset(ZoneOffset.UTC))
+					.build();
+			})
 			.toList();
 		log.debug("[UserActivityService] 구독 관심사 {}건 조회 완료", subscriptions.size());
 
 		// 최근 작성한 댓글
-		List<String> comments = userActivityCommentRepository
+		List<CommentSummaryDto> comments = userActivityCommentRepository
 			.findTop10ByUser_IdOrderByCreatedAtDesc(userId)
 			.stream()
-			.map(c -> c.getContent())
-			.toList();
+			.map(c -> CommentSummaryDto.builder()
+				.id(c.getId())
+				.articleId(c.getArticle().getId())
+				.articleTitle(c.getArticle().getTitle())
+				.userId(c.getUser().getId())
+				.userNickname(c.getUser().getNickname())
+				.content(c.getContent())
+				.likeCount(c.getLikeCount())
+				.createdAt(c.getCreatedAt().atOffset(ZoneOffset.UTC))
+				.build()
+			).toList();
 		log.debug("[UserActivityService] 댓글 {}건 조회 완료", comments.size());
 
 		// 최근 좋아요한 댓글
-		List<String> commentLikes = userActivityCommentLikeRepository
+		List<CommentLikeSummaryDto> commentLikes = userActivityCommentLikeRepository
 			.findTop10ByUser_IdOrderByCreatedAtDesc(userId)
 			.stream()
-			.map(cl ->cl.getComment().getContent())
-			.toList();
+			.map(cl ->CommentLikeSummaryDto.builder()
+				.id(cl.getId())
+				.createdAt(cl.getCreatedAt().atOffset(ZoneOffset.UTC))
+				.commentId(cl.getComment().getId())
+				.articleId(cl.getComment().getArticle().getId())
+				.articleTitle(cl.getComment().getArticle().getTitle())
+				.commentUserId(cl.getComment().getUser().getId())
+				.commentUserNickname(cl.getComment().getUser().getNickname())
+				.commentContent(cl.getComment().getContent())
+				.commentLikeCount(cl.getComment().getLikeCount())
+				.commentCreatedAt(cl.getComment().getCreatedAt().atOffset(ZoneOffset.UTC))
+				.build()
+			).toList();
 		log.debug("[UserActivityService] 댓글 좋아요 {}건 조회 완료", commentLikes.size());
 
 		// 최근 본 뉴스 기사
-		List<String> articleViews = userActivityArticleViewRepository
+		List<ArticleViewSummaryDto> articleViews = userActivityArticleViewRepository
 			.findTop10ByUser_IdOrderByCreatedAtDesc(userId)
 			.stream()
-			.map(av ->av.getArticle().getTitle())
-			.toList();
+			.map(av -> ArticleViewSummaryDto.builder()
+				.id(av.getId())
+				.viewedBy(av.getUser().getId())
+				.createdAt(av.getCreatedAt().atOffset(ZoneOffset.UTC))
+				.articleId(av.getArticle().getId())
+				.source(av.getArticle().getSource())
+				.sourceUrl(av.getArticle().getSourceUrl())
+				.articleTitle(av.getArticle().getTitle())
+				.articlePublishedDate(av.getArticle().getPublishedAt().atOffset(ZoneOffset.UTC))
+				.articleSummary(av.getArticle().getSummary())
+				.articleCommentCount(av.getArticle().getCommentCount())
+				.articleViewCount(av.getArticle().getViewCount())
+				.build()
+			).toList();
 		log.debug("[UserActivityService] 기사 조회 {}건 완료", articleViews.size());
 
 

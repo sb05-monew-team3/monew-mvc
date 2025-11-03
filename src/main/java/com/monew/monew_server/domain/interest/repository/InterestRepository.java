@@ -25,7 +25,7 @@ public interface InterestRepository extends JpaRepository<Interest, UUID>, Inter
 
     default Interest getOrThrow(UUID id) {
         return findById(id).orElseThrow(() ->
-            new NotFoundException(ErrorCode.INTEREST_NOT_FOUND, "Interest not found with id: " + id)
+            new NotFoundException(ErrorCode.INTEREST_NOT_FOUND)
         );
     }
 }

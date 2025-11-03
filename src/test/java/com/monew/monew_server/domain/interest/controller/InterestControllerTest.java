@@ -226,7 +226,7 @@ class InterestControllerTest {
 
         // Service가 NotFoundException 던지도록 Mocking
         when(interestService.subscribe(interestId, userId))
-            .thenThrow(new NotFoundException(ErrorCode.INTEREST_NOT_FOUND, "Interest not found"));
+            .thenThrow(new NotFoundException(ErrorCode.INTEREST_NOT_FOUND));
 
         // when & then
         mockMvc.perform(post("/api/interests/{interestId}/subscriptions", interestId)
@@ -295,7 +295,7 @@ class InterestControllerTest {
         UUID fakeInterestId = UUID.randomUUID();
 
         // 1. service.delete(id)가 호출될 때 NotFoundException을 던지도록 Mocking
-        doThrow(new NotFoundException(ErrorCode.INTEREST_NOT_FOUND, "Test Not Found"))
+        doThrow(new NotFoundException(ErrorCode.INTEREST_NOT_FOUND))
             .when(interestService)
             .delete(fakeInterestId);
 
@@ -353,7 +353,7 @@ class InterestControllerTest {
 
         // 1. service.update(id)가 호출될 때 NotFoundException을 던지도록 Mocking
         when(interestService.update(eq(fakeInterestId), any(InterestUpdateRequest.class)))
-            .thenThrow(new NotFoundException(ErrorCode.INTEREST_NOT_FOUND, "Test Not Found"));
+            .thenThrow(new NotFoundException(ErrorCode.INTEREST_NOT_FOUND));
 
         // when & then
         mockMvc.perform(patch("/api/interests/{interestId}", fakeInterestId)

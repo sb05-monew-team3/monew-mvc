@@ -3,12 +3,9 @@ package com.monew.monew_server.exception;
 import lombok.Getter;
 
 @Getter
-public class NotFoundException extends RuntimeException {
+public class NotFoundException extends BaseException {
 
-	private final ErrorCode errorCode;
-
-	public NotFoundException(ErrorCode errorCode, String message) {
-		super(message);
-		this.errorCode = errorCode;
+	public NotFoundException(ErrorCode errorCode) {
+    	super(errorCode);
 	}
 }

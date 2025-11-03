@@ -124,12 +124,11 @@ public class InterestQueryRepositoryImpl implements InterestQueryRepository {
             .toList();
 
         // 전체 카운트 조회
-        Long total = queryFactory
+        Long totalElements = queryFactory
             .select(interest.count())
             .from(interest)
             .where(buildKeywordFilter(query.keyword()))
             .fetchOne();
-        long totalElements = (total != null) ? total : 0;
 
         if (!hasNext) {
             return new CursorPageResponseInterestDto(

@@ -239,7 +239,7 @@ class ArticleRepositoryTest {
 
 	@Test
 	@DisplayName("sourceIn에 잘못된 값이 있을 때 무시")
-	void shouldIgnoreInvalidSourceValues() {
+	void shouldIgnoreInvalidSourceValue() {
 		Article article = createArticleWithSource("기사", ArticleSource.NAVER);
 		articleRepository.save(article);
 

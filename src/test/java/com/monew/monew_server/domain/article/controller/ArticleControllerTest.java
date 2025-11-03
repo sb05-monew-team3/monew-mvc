@@ -134,7 +134,7 @@ class ArticleControllerTest {
 
 	@Test
 	@DisplayName("기사 조회수 추가 API 호출 성공")
-	void shouldAddArticleView() throws Exception {
+	void shouldAddArticleViews() throws Exception {
 		doNothing().when(articleService).addArticleView(any(UUID.class), any(UUID.class));
 
 		mockMvc.perform(post("/api/articles/" + ARTICLE_ID_1 + "/article-views")

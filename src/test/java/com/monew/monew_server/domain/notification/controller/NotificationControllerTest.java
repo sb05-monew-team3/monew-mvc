@@ -27,8 +27,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
 import com.monew.monew_server.domain.notification.dto.NotificationDto;
 import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
-import com.monew.monew_server.domain.notification.exception.NotificationNotFoundException;
 import com.monew.monew_server.domain.notification.service.NotificationService;
+import com.monew.monew_server.exception.NotificationNotFoundException;
 
 @WebMvcTest(controllers = NotificationController.class,
 	excludeAutoConfiguration = {

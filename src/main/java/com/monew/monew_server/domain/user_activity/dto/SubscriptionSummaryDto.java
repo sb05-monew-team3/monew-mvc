@@ -1,6 +1,6 @@
 package com.monew.monew_server.domain.user_activity.dto;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 
@@ -15,5 +15,5 @@ public class SubscriptionSummaryDto {
 	private String interestName;
 	private List<String> interestKeywords;
 	private long interestSubscriberCount;
-	private OffsetDateTime createdAt;
+	private Instant createdAt;
 }

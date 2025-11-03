@@ -23,7 +23,7 @@ public interface UserActivityMapper {
 	@Mapping(target = "id", source = "user.id")
 	@Mapping(target = "email", source = "user.email")
 	@Mapping(target = "nickname", source = "user.nickname")
-	@Mapping(target = "createdAt", expression = "java(user.getCreatedAt().atOffset(java.time.ZoneOffset.UTC))")
+	@Mapping(target = "createdAt", expression = "java(user.getCreatedAt())")
 	@Mapping(target = "subscriptions", source = "subscriptions")
 	@Mapping(target = "comments", source = "comments")
 	@Mapping(target = "commentLikes", source = "commentLikes")

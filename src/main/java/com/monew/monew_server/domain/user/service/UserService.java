@@ -1,6 +1,5 @@
 package com.monew.monew_server.domain.user.service;
 
-import java.time.OffsetDateTime;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -60,7 +59,7 @@ public class UserService {
 			.id(user.getId())
 			.email(user.getEmail())
 			.nickname(user.getNickname())
-			.createdAt(user.getCreatedAt().atOffset(java.time.ZoneOffset.UTC))
+			.createdAt(user.getCreatedAt())
 			.build();
 	}
 
@@ -91,7 +90,7 @@ public class UserService {
 			.id(user.getId())
 			.email(user.getEmail())
 			.nickname(user.getNickname())
-			.createdAt(user.getCreatedAt().atOffset(java.time.ZoneOffset.UTC))
+			.createdAt(user.getCreatedAt())
 			.build();
 	}
 

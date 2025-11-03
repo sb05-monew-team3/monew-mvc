@@ -1,6 +1,6 @@
 package com.monew.monew_server.domain.user_activity.dto;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import lombok.Builder;
@@ -16,5 +16,5 @@ public class CommentSummaryDto {
 	private String userNickname;
 	private String content;
 	private long likeCount;
-	private OffsetDateTime createdAt;
+	private Instant createdAt;
 }

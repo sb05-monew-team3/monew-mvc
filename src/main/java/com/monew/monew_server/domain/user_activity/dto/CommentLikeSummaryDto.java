@@ -1,6 +1,6 @@
 package com.monew.monew_server.domain.user_activity.dto;
 
-import java.time.OffsetDateTime;
+import java.time.Instant;
 import java.util.UUID;
 
 import lombok.Builder;
@@ -10,7 +10,7 @@ import lombok.Getter;
 @Builder
 public class CommentLikeSummaryDto {
 	private UUID id;
-	private OffsetDateTime createdAt;
+	private Instant createdAt;
 	private UUID commentId;
 	private UUID articleId;
 	private String articleTitle;
@@ -18,5 +18,5 @@ public class CommentLikeSummaryDto {
 	private String commentUserNickname;
 	private String commentContent;
 	private long commentLikeCount;
-	private OffsetDateTime commentCreatedAt;
+	private Instant commentCreatedAt;
 }

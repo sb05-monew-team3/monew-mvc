@@ -1,6 +1,7 @@
 package com.monew.monew_server.domain.user_activity.service;
 
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
@@ -41,9 +42,8 @@ public class UserActivityService {
 	private final UserActivityCommentRepository userActivityCommentRepository;
 	private final UserActivityCommentLikeRepository userActivityCommentLikeRepository;
 	private final UserActivityArticleViewRepository userActivityArticleViewRepository;
-
-	//추가
 	private final UserActivityInterestKeywordRepository userActivityInterestKeywordRepository;
+
 
 	/*
 	 * 사용자 기본 정보 조회
@@ -100,7 +100,7 @@ public class UserActivityService {
 					.interestName(s.getInterest().getName())
 					.interestKeywords(keywords)
 					.interestSubscriberCount(subscriberCount)
-					.createdAt(s.getCreatedAt().atOffset(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS))
+					.createdAt(s.getCreatedAt())
 					.build();
 			})
 			.toList();
@@ -121,7 +121,7 @@ public class UserActivityService {
 					.userNickname(c.getUser().getNickname())
 					.content(c.getContent())
 					.likeCount(likeCount)
-					.createdAt(c.getCreatedAt().atOffset(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS))
+					.createdAt(c.getCreatedAt())
 					.build();
 			})
 			.toList();
@@ -139,7 +139,7 @@ public class UserActivityService {
 
 				return CommentLikeSummaryDto.builder()
 					.id(cl.getId())
-					.createdAt(cl.getCreatedAt().atOffset(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS))
+					.createdAt(cl.getCreatedAt())
 					.commentId(commentId)
 					.articleId(cl.getComment().getArticle().getId())
 					.articleTitle(cl.getComment().getArticle().getTitle())
@@ -147,7 +147,7 @@ public class UserActivityService {
 					.commentUserNickname(cl.getComment().getUser().getNickname())
 					.commentContent(cl.getComment().getContent())
 					.commentLikeCount(likeCount)
-					.commentCreatedAt(cl.getComment().getCreatedAt().atOffset(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS))
+					.commentCreatedAt(cl.getComment().getCreatedAt())
 					.build();
 			})
 			.toList();
@@ -166,12 +166,12 @@ public class UserActivityService {
 				return ArticleViewSummaryDto.builder()
 					.id(av.getId())
 					.viewedBy(av.getUser().getId())
-					.createdAt(av.getCreatedAt().atOffset(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS))
+					.createdAt(av.getCreatedAt())
 					.articleId(article.getId())
 					.source(article.getSource().name())
 					.sourceUrl(article.getSourceUrl())
 					.articleTitle(article.getTitle())
-					.articlePublishDate(article.getPublishDate().atOffset(ZoneOffset.UTC).truncatedTo(ChronoUnit.MILLIS))
+					.articlePublishDate(article.getPublishDate())
 					.articleSummary(article.getSummary())
 					.articleCommentCount(commentCount)
 					.articleViewCount(viewCount)

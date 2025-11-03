@@ -90,4 +90,26 @@ class InterestMapperTest {
         assertThat(dto.subscriberCount()).isNull();
         assertThat(dto.subscribedByMe()).isTrue();
     }
+
+    @Test
+    @DisplayName("toDto: subscribedByMe가 null일 때, DTO의 subscribedByMe는 null이어야 한다")
+    void toDto_shouldHandleNullSubscribedByMe() {
+        // given
+        // 다른 파라미터는 non-null로 설정하여
+        // "모든 파라미터 null" 분기를 피하게 함
+        Interest interest = Interest.builder().name("Java").build();
+        List<String> keywords = List.of("k1");
+        Long subscriberCount = 5L;
+
+        // when
+        // subscribedByMe 파라미터에 null 전달
+        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, null);
+
+        // then
+        assertThat(dto).isNotNull();
+        assertThat(dto.name()).isEqualTo("Java");
+        assertThat(dto.keywords()).containsExactly("k1");
+        assertThat(dto.subscriberCount()).isEqualTo(5L);
+        assertThat(dto.subscribedByMe()).isNull(); // subscribedByMe가 null인지 확인
+    }
 }

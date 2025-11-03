@@ -26,10 +26,10 @@ public class UserActivityDto {
 	private String nickname;
 	private OffsetDateTime createdAt;
 
-	private List<String> subscriptions;
-	private List<String> comments;
-	private List<String> commentLikes;
-	private List<String> articleViews;
+	private List<SubscriptionSummaryDto> subscriptions;
+	private List<CommentSummaryDto> comments;
+	private List<CommentLikeSummaryDto> commentLikes;
+	private List<ArticleViewSummaryDto> articleViews;
 
 
 }

@@ -106,18 +106,4 @@ public class UserService {
 
 		user.softDelete();
 	}
-
-	@Transactional
-	public void hardDeleteUser(UUID userId) {
-		User user = userRepository.findById(userId)
-			.orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자 입니다."));
-
-		if (user.getDeletedAt() == null) {
-			throw new IllegalArgumentException("소프트 삭제되지 않는 사용자는 하드 삭제할 수 없습니다.");
-		}
-
-		userRepository.delete(user);
-	}
-
-
 }

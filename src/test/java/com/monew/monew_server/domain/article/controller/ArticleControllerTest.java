@@ -6,6 +6,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 import java.time.Instant;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
@@ -22,6 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
+import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
+import com.monew.monew_server.domain.article.dto.ArticleSourceDto;
 import com.monew.monew_server.domain.article.dto.CursorPageResponseArticleDto;
 import com.monew.monew_server.domain.article.service.ArticleService;
 
@@ -48,7 +51,6 @@ class ArticleControllerTest {
 	@Test
 	@DisplayName("전체 뉴스 목록 조회 성공")
 	void shouldReturnArticles_whenGetArticles() throws Exception {
-
 		ArticleResponse article1 = new ArticleResponse(
 			ARTICLE_ID_1, "기사 제목 1", "기사 요약 1", "NAVER", Instant.now(), 10L, 2L, true
 		);
@@ -68,11 +70,11 @@ class ArticleControllerTest {
 
 		mockMvc.perform(get("/api/articles")
 				.param("keyword", "")
-				.param("size", "10")
-				.param("sortBy", "DATE")
+				.param("limit", "10")
+				.param("orderBy", "DATE")
 				.param("cursor", "")
-				.param("nextAfter", "")
-				.header("Monew-Request-User-ID", "00000000-0000-0000-0000-000000000001")
+				.param("direction", "DESC")
+				.header("Monew-Request-User-ID", ARTICLE_ID_1.toString())
 			)
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content.length()").value(2))
@@ -100,11 +102,10 @@ class ArticleControllerTest {
 
 		mockMvc.perform(get("/api/articles")
 				.param("keyword", "삼성전자")
-				.param("size", "10")
-				.param("sortBy", "DATE")
-				.param("cursor", "")        // 빈 문자열 대신 null로 보내도 됨
-				.param("nextAfter", "")     // 빈 문자열 대신 null로 보내도 됨
-				.header("Monew-Request-User-ID", "00000000-0000-0000-0000-000000000001")
+				.param("limit", "10")
+				.param("orderBy", "DATE")
+				.param("direction", "DESC")
+				.header("Monew-Request-User-ID", ARTICLE_ID_1.toString())
 			)
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content.length()").value(1))
@@ -112,102 +113,275 @@ class ArticleControllerTest {
 	}
 
 	@Test
-	@DisplayName("정렬 조건(date) 테스트")
-	void shouldSortArticlesByDate() throws Exception {
-		UUID id1 = UUID.fromString("00000000-0000-0000-0000-000000000010");
-		UUID id2 = UUID.fromString("00000000-0000-0000-0000-000000000011");
-
-		ArticleResponse latestArticle = new ArticleResponse(
-			id1, "최신 기사", "내용", "NAVER", Instant.now(), 1L, 0L, false
+	@DisplayName("단일 기사 조회 성공")
+	void shouldReturnSingleArticle_whenGetArticleById() throws Exception {
+		ArticleResponse article = new ArticleResponse(
+			ARTICLE_ID_1, "단일 기사", "요약", "NAVER", Instant.now(),
+			5L,   // commentCount
+			10L,  // viewCount (순서 수정!)
+			true
 		);
-		ArticleResponse olderArticle = new ArticleResponse(
-			id2, "오래된 기사", "내용", "NAVER", Instant.now().minusSeconds(86400), 1L, 0L, false
+		when(articleService.getArticleById(any(UUID.class), any(UUID.class)))
+			.thenReturn(article);
+
+		mockMvc.perform(get("/api/articles/" + ARTICLE_ID_1)
+				.header("Monew-Request-User-ID", ARTICLE_ID_2.toString()))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.title").value("단일 기사"))
+			.andExpect(jsonPath("$.commentCount").value(5))  // 추가 검증
+			.andExpect(jsonPath("$.viewCount").value(10));
+	}
+
+	@Test
+	@DisplayName("기사 조회수 추가 API 호출 성공")
+	void shouldAddArticleView() throws Exception {
+		doNothing().when(articleService).addArticleView(any(UUID.class), any(UUID.class));
+
+		mockMvc.perform(post("/api/articles/" + ARTICLE_ID_1 + "/article-views")
+				.header("Monew-Request-User-ID", ARTICLE_ID_2.toString()))
+			.andExpect(status().isOk());
+	}
+
+	@Test
+	@DisplayName("기사 소스 목록 조회 성공")
+	void shouldReturnArticleSources() throws Exception {
+		List<ArticleSourceDto> mockSources = List.of(
+			new ArticleSourceDto("NAVER"),
+			new ArticleSourceDto("HANKYUNG")
+		);
+		when(articleService.getAllSources()).thenReturn(mockSources);
+
+		mockMvc.perform(get("/api/articles/sources"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].name").value("NAVER"))
+			.andExpect(jsonPath("$[1].name").value("HANKYUNG"));
+	}
+
+	@Test
+	@DisplayName("기사 소프트 삭제 성공")
+	void shouldSoftDeleteArticle() throws Exception {
+		doNothing().when(articleService).softDeleteArticle(ARTICLE_ID_1);
+
+		mockMvc.perform(delete("/api/articles/" + ARTICLE_ID_1))
+			.andExpect(status().isNoContent());
+	}
+
+	@Test
+	@DisplayName("기사 하드 삭제 성공")
+	void shouldHardDeleteArticle() throws Exception {
+		doNothing().when(articleService).hardDeleteArticle(ARTICLE_ID_2);
+
+		mockMvc.perform(delete("/api/articles/" + ARTICLE_ID_2 + "/hard"))
+			.andExpect(status().isNoContent());
+	}
+
+	// ✅ 8. 복구 API 테스트
+	@Test
+	@DisplayName("기사 복구 API 성공")
+	void shouldRestoreArticles() throws Exception {
+		List<ArticleRestoreResult> results = List.of(
+			new ArticleRestoreResult(LocalDateTime.now(), List.of(ARTICLE_ID_1), 1)
 		);
 
-		List<ArticleResponse> sortedArticles = List.of(latestArticle, olderArticle);
+		when(articleService.restoreArticles(any(LocalDateTime.class), any(LocalDateTime.class)))
+			.thenReturn(results);
 
+		mockMvc.perform(get("/api/articles/restore")
+				.param("from", "2025-01-01T00:00:00")
+				.param("to", "2025-01-02T00:00:00"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$[0].restoredArticleCount").value(1))  // 필드명 수정
+			.andExpect(jsonPath("$[0].restoredArticleIds[0]").value(ARTICLE_ID_1.toString()))  // 추가 검증
+			.andExpect(jsonPath("$[0].restoreDate").exists());  // 날짜 존재 확인
+	}
+
+	@Test
+	@DisplayName("잘못된 UUID 헤더가 전달된 경우에도 정상 응답")
+	void shouldHandleInvalidUUIDHeaderGracefully() throws Exception {
 		CursorPageResponseArticleDto mockResponse = CursorPageResponseArticleDto.builder()
-			.content(sortedArticles)
+			.content(List.of())
 			.hasNext(false)
 			.size(10)
-			.totalElements(2)
+			.totalElements(0)
 			.build();
 
 		when(articleService.fetchArticles(any(ArticleRequest.class), any(UUID.class)))
 			.thenReturn(mockResponse);
 
 		mockMvc.perform(get("/api/articles")
-				.param("sortBy", "DATE")
-				.param("size", "10")
-				.param("cursor", "")
-				.param("nextAfter", "")
-				.header("Monew-Request-User-ID", "00000000-0000-0000-0000-000000000001")
-			)
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content[0].title").value("최신 기사"));
+				.header("Monew-Request-User-ID", "INVALID-UUID"))
+			.andExpect(status().isOk());
 	}
 
 	@Test
-	@DisplayName("정렬 조건(viewcount) 테스트")
-	void shouldSortArticlesByViewCount() throws Exception {
-		UUID id1 = UUID.fromString("00000000-0000-0000-0000-000000000020");
-		UUID id2 = UUID.fromString("00000000-0000-0000-0000-000000000021");
-
-		ArticleResponse articleWithHighViews = new ArticleResponse(
-			id1, "조회수 1위 기사", "내용", "NAVER", Instant.now(), 5L, 100L, false
-		);
-		ArticleResponse articleWithLowViews = new ArticleResponse(
-			id2, "조회수 낮은 기사", "내용", "CHOSUN", Instant.now(), 1L, 10L, false
-		);
-
-		List<ArticleResponse> sortedArticles = List.of(articleWithHighViews, articleWithLowViews);
-
+	@DisplayName("User-ID 헤더가 null인 경우 정상 처리")
+	void shouldHandleNullUserIdHeader() throws Exception {
 		CursorPageResponseArticleDto mockResponse = CursorPageResponseArticleDto.builder()
-			.content(sortedArticles)
+			.content(List.of())
 			.hasNext(false)
 			.size(10)
-			.totalElements(2)
+			.totalElements(0)
 			.build();
 
-		when(articleService.fetchArticles(any(ArticleRequest.class), any(UUID.class)))
+		when(articleService.fetchArticles(any(ArticleRequest.class), isNull()))
 			.thenReturn(mockResponse);
 
-		mockMvc.perform(get("/api/articles?sortBy=VIEW_COUNT")
-				.header("Monew-Request-User-ID", "00000000-0000-0000-0000-000000000001"))
-			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content[0].title").value("조회수 1위 기사"))
-			.andExpect(jsonPath("$.content[0].viewCount").value(100));
+		mockMvc.perform(get("/api/articles")
+				.param("limit", "10"))
+			.andExpect(status().isOk());
+
+		verify(articleService).fetchArticles(any(ArticleRequest.class), isNull());
 	}
 
 	@Test
-	@DisplayName("정렬 조건(commentcount) 테스트")
-	void shouldSortArticlesByCommentCount() throws Exception {
-		UUID id1 = UUID.fromString("00000000-0000-0000-0000-000000000030");
-		UUID id2 = UUID.fromString("00000000-0000-0000-0000-000000000031");
-
-		ArticleResponse articleWithManyComments = new ArticleResponse(
-			id1, "댓글 많은 기사", "내용", "NAVER", Instant.now(), 50L, 50L, false
-		);
-		ArticleResponse articleWithFewComments = new ArticleResponse(
-			id2, "댓글 적은 기사", "내용", "CHOSUN", Instant.now(), 5L, 20L, false
-		);
-
-		List<ArticleResponse> sortedArticles = List.of(articleWithManyComments, articleWithFewComments);
-
+	@DisplayName("User-ID 헤더가 빈 문자열인 경우 정상 처리")
+	void shouldHandleEmptyUserIdHeader() throws Exception {
 		CursorPageResponseArticleDto mockResponse = CursorPageResponseArticleDto.builder()
-			.content(sortedArticles)
+			.content(List.of())
 			.hasNext(false)
 			.size(10)
-			.totalElements(2)
+			.totalElements(0)
 			.build();
 
-		when(articleService.fetchArticles(any(ArticleRequest.class), any(UUID.class)))
+		when(articleService.fetchArticles(any(ArticleRequest.class), isNull()))
 			.thenReturn(mockResponse);
 
-		mockMvc.perform(get("/api/articles?sortBy=COMMENT_COUNT")
-				.header("Monew-Request-User-ID", "00000000-0000-0000-0000-000000000001"))
+		mockMvc.perform(get("/api/articles")
+				.header("Monew-Request-User-ID", "")
+				.param("limit", "10"))
+			.andExpect(status().isOk());
+
+		verify(articleService).fetchArticles(any(ArticleRequest.class), isNull());
+	}
+
+	@Test
+	@DisplayName("User-ID 헤더가 공백만 있는 경우 정상 처리")
+	void shouldHandleBlankUserIdHeader() throws Exception {
+		CursorPageResponseArticleDto mockResponse = CursorPageResponseArticleDto.builder()
+			.content(List.of())
+			.hasNext(false)
+			.size(10)
+			.totalElements(0)
+			.build();
+
+		when(articleService.fetchArticles(any(ArticleRequest.class), isNull()))
+			.thenReturn(mockResponse);
+
+		mockMvc.perform(get("/api/articles")
+				.header("Monew-Request-User-ID", "   ")
+				.param("limit", "10"))
+			.andExpect(status().isOk());
+
+		verify(articleService).fetchArticles(any(ArticleRequest.class), isNull());
+	}
+
+	@Test
+	@DisplayName("단일 기사 조회 시 User-ID 헤더 없이도 정상 처리")
+	void shouldGetArticleByIdWithoutUserIdHeader() throws Exception {
+		ArticleResponse article = new ArticleResponse(
+			ARTICLE_ID_1, "단일 기사", "요약", "NAVER", Instant.now(), 5L, 10L, false
+		);
+		when(articleService.getArticleById(eq(ARTICLE_ID_1), isNull()))
+			.thenReturn(article);
+
+		mockMvc.perform(get("/api/articles/" + ARTICLE_ID_1))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$.content[0].title").value("댓글 많은 기사"))
-			.andExpect(jsonPath("$.content[0].commentCount").value(50));
+			.andExpect(jsonPath("$.title").value("단일 기사"));
+
+		verify(articleService).getArticleById(eq(ARTICLE_ID_1), isNull());
+	}
+
+	@Test
+	@DisplayName("단일 기사 조회 시 잘못된 UUID 헤더 처리")
+	void shouldGetArticleByIdWithInvalidUserIdHeader() throws Exception {
+		ArticleResponse article = new ArticleResponse(
+			ARTICLE_ID_1, "단일 기사", "요약", "NAVER", Instant.now(), 5L, 10L, false
+		);
+		when(articleService.getArticleById(eq(ARTICLE_ID_1), isNull()))
+			.thenReturn(article);
+
+		mockMvc.perform(get("/api/articles/" + ARTICLE_ID_1)
+				.header("Monew-Request-User-ID", "invalid-uuid"))
+			.andExpect(status().isOk());
+
+		verify(articleService).getArticleById(eq(ARTICLE_ID_1), isNull());
+	}
+
+	@Test
+	@DisplayName("조회수 추가 시 User-ID 헤더 없이도 정상 처리")
+	void shouldAddArticleViewWithoutUserIdHeader() throws Exception {
+		doNothing().when(articleService).addArticleView(eq(ARTICLE_ID_1), isNull());
+
+		mockMvc.perform(post("/api/articles/" + ARTICLE_ID_1 + "/article-views"))
+			.andExpect(status().isOk());
+
+		verify(articleService).addArticleView(eq(ARTICLE_ID_1), isNull());
+	}
+
+	@Test
+	@DisplayName("조회수 추가 시 잘못된 UUID 헤더 처리")
+	void shouldAddArticleViewWithInvalidUserIdHeader() throws Exception {
+		doNothing().when(articleService).addArticleView(eq(ARTICLE_ID_1), isNull());
+
+		mockMvc.perform(post("/api/articles/" + ARTICLE_ID_1 + "/article-views")
+				.header("Monew-Request-User-ID", "not-a-uuid"))
+			.andExpect(status().isOk());
+
+		verify(articleService).addArticleView(eq(ARTICLE_ID_1), isNull());
+	}
+
+	@Test
+	@DisplayName("유효한 UUID 헤더로 전체 기사 목록 조회")
+	void shouldGetArticlesWithValidUserIdHeader() throws Exception {
+		UUID validUserId = UUID.randomUUID();
+		CursorPageResponseArticleDto mockResponse = CursorPageResponseArticleDto.builder()
+			.content(List.of())
+			.hasNext(false)
+			.size(10)
+			.totalElements(0)
+			.build();
+
+		when(articleService.fetchArticles(any(ArticleRequest.class), eq(validUserId)))
+			.thenReturn(mockResponse);
+
+		mockMvc.perform(get("/api/articles")
+				.header("Monew-Request-User-ID", validUserId.toString())
+				.param("limit", "10"))
+			.andExpect(status().isOk());
+
+		verify(articleService).fetchArticles(any(ArticleRequest.class), eq(validUserId));
+	}
+
+	@Test
+	@DisplayName("복수 개의 복구 결과 반환")
+	void shouldRestoreMultipleArticles() throws Exception {
+		List<ArticleRestoreResult> results = List.of(
+			new ArticleRestoreResult(LocalDateTime.now(), List.of(ARTICLE_ID_1), 1),
+			new ArticleRestoreResult(LocalDateTime.now().plusHours(1), List.of(ARTICLE_ID_2), 1)
+		);
+
+		when(articleService.restoreArticles(any(LocalDateTime.class), any(LocalDateTime.class)))
+			.thenReturn(results);
+
+		mockMvc.perform(get("/api/articles/restore")
+				.param("from", "2025-01-01T00:00:00")
+				.param("to", "2025-01-02T00:00:00"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(2))
+			.andExpect(jsonPath("$[0].restoredArticleCount").value(1))
+			.andExpect(jsonPath("$[1].restoredArticleCount").value(1));
+	}
+
+	@Test
+	@DisplayName("복구할 기사가 없는 경우 빈 배열 반환")
+	void shouldReturnEmptyListWhenNoArticlesToRestore() throws Exception {
+		when(articleService.restoreArticles(any(LocalDateTime.class), any(LocalDateTime.class)))
+			.thenReturn(List.of());
+
+		mockMvc.perform(get("/api/articles/restore")
+				.param("from", "2025-01-01T00:00:00")
+				.param("to", "2025-01-02T00:00:00"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.length()").value(0));
 	}
 }

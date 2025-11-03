@@ -11,16 +11,16 @@ import software.amazon.awssdk.regions.Region;
 import software.amazon.awssdk.services.s3.S3Client;
 
 @Configuration
-@Profile("prod")
+@Profile("local")
 public class S3Config {
 
-	@Value("${aws.accessKeyId}")
+	@Value("${spring.aws.accessKeyId}")
 	private String accessKeyId;
-	
-	@Value("${aws.secretKey}")
+
+	@Value("${spring.aws.secretKey}")
 	private String secretKey;
 
-	@Value("${aws.region}")
+	@Value("${spring.aws.region}")
 	private String region;
 
 	@Bean

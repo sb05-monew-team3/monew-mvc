@@ -6,6 +6,7 @@ import java.util.UUID;
 
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.entity.Article;
+import com.monew.monew_server.domain.article.entity.ArticleSource;
 
 public interface ArticleRepositoryCustom {
 
@@ -16,4 +17,6 @@ public interface ArticleRepositoryCustom {
 	Optional<Article> findArticleById(UUID articleId);
 
 	Optional<Article> findByIdAndDeletedAtIsNull(UUID articleId);
+
+	List<Article> findBySourceInAndSourceUrlIn(List<ArticleSource> sources, List<String> sourceUrls);
 }

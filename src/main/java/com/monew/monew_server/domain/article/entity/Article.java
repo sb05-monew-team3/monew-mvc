@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.List;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
 
@@ -55,4 +56,18 @@ public class Article extends BaseDeletableEntity {
 
 	@OneToMany(mappedBy = "article")
 	private List<ArticleInterest> articleInterests;
+
+	public static Article fromDto(ArticleSaveDto dto) {
+		return Article.builder()
+			.source(dto.getSource())
+			.sourceUrl(dto.getSourceUrl())
+			.title(dto.getTitle())
+			.summary(dto.getSummary())
+			.publishDate(dto.getPublishDate())
+			.build();
+	}
+
+	public String getOriginalLink() {
+		return source + ":" + sourceUrl;
+	}
 }

@@ -1,20 +1,24 @@
 package com.monew.monew_server.domain.article.dto;
 
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
-import com.monew.monew_server.domain.article.entity.ArticleSortType;
-import com.monew.monew_server.domain.article.entity.ArticleSource;
+import org.springframework.format.annotation.DateTimeFormat;
 
 public record ArticleRequest(
 	String keyword,
-	List<UUID> interestIds,
-	ArticleSource source,
-	LocalDate date,
+	UUID interestId,
+	List<String> sourceIn,
+	@DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+	LocalDateTime publishDateFrom,
+	@DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+	LocalDateTime publishDateTo,
+	String orderBy,
+	String direction,
 	String cursor,
-	ArticleSortType sortBy,
-	Integer size,
-	String nextAfter
+	@DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME)
+	LocalDateTime after,
+	Integer limit
 ) {
 }

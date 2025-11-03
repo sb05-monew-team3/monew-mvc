@@ -1,8 +1,10 @@
 package com.monew.monew_server.domain.article.controller;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.UUID;
 
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,10 +13,12 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
+import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
 import com.monew.monew_server.domain.article.dto.ArticleSourceDto;
 import com.monew.monew_server.domain.article.dto.CursorPageResponseArticleDto;
 import com.monew.monew_server.domain.article.service.ArticleService;
@@ -96,5 +100,14 @@ public class ArticleController {
 	public ResponseEntity<Void> hardDeleteArticle(@PathVariable UUID articleId) {
 		articleService.hardDeleteArticle(articleId);
 		return ResponseEntity.noContent().build();
+	}
+
+	@GetMapping("/restore")
+	public ResponseEntity<List<ArticleRestoreResult>> restoreArticles(
+		@RequestParam("from") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime from,
+		@RequestParam("to") @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime to) {
+
+		List<ArticleRestoreResult> response = articleService.restoreArticles(from, to);
+		return ResponseEntity.ok(response);
 	}
 }

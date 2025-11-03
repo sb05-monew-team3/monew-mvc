@@ -31,11 +31,5 @@ public interface UserActivityMapper {
 		List<String> articleViews
 	);
 
-	@Mapping(target = "nickname", source ="nickname")
-	@Mapping(target = "email" , source = "email")
 	UserInfoDto toUserInfoDto(User user);
-
-
-
-
 }

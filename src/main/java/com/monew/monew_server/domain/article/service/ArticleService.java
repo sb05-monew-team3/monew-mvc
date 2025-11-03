@@ -44,8 +44,8 @@ import lombok.extern.slf4j.Slf4j;
 @Service
 public class ArticleService {
 
-	private final ArticleRepository articleRepository; // JpaRepository
-	private final ArticleRepositoryCustom articleRepositoryCustom; // @Qualifier 필요
+	private final ArticleRepository articleRepository;
+	private final ArticleRepositoryCustom articleRepositoryCustom;
 	private final ArticleMapper articleMapper;
 	private final ArticleViewRepository articleViewRepository;
 	private final CommentRepository commentRepository;
@@ -114,37 +114,30 @@ public class ArticleService {
 			sortBy = ArticleSortType.DATE;
 		}
 
-		String direction = Optional.ofNullable(request.direction()).orElse("DESC").toUpperCase();
-
 		String nextCursor = null;
 		String nextAfterString = null;
 		List<ArticleResponse> finalContentList = enrichedResponses;
 
 		if (hasNext) {
-			ArticleResponse nextCursorArticle = enrichedResponses.get(requestedSize);
-			nextCursor = nextCursorArticle.id().toString();
+			// 마지막 항목 (실제로는 limit+1 번째 항목)
+			ArticleResponse lastArticle = enrichedResponses.get(requestedSize);
 
+			// nextCursor는 정렬 기준 값으로 설정 (Interest 방식)
 			switch (sortBy) {
-				case DATE -> nextAfterString = nextCursorArticle.publishDate().toString();
-				case COMMENT_COUNT -> nextAfterString = String.valueOf(
-					nextCursorArticle.commentCount() != null ? nextCursorArticle.commentCount() : 0
+				case DATE -> nextCursor = lastArticle.publishDate().toString();
+				case COMMENT_COUNT -> nextCursor = String.valueOf(
+					lastArticle.commentCount() != null ? lastArticle.commentCount() : 0
 				);
-				case VIEW_COUNT -> nextAfterString = String.valueOf(
-					nextCursorArticle.viewCount() != null ? nextCursorArticle.viewCount() : 0
+				case VIEW_COUNT -> nextCursor = String.valueOf(
+					lastArticle.viewCount() != null ? lastArticle.viewCount() : 0
 				);
 			}
 
+			// nextAfter는 tie-breaker용 (publishDate)
+			nextAfterString = lastArticle.publishDate().toString();
+
+			// 실제 반환할 데이터는 limit 개수만큼만
 			finalContentList = enrichedResponses.subList(0, requestedSize);
-		} else if (!enrichedResponses.isEmpty() &&
-			(sortBy == ArticleSortType.VIEW_COUNT || sortBy == ArticleSortType.COMMENT_COUNT)) {
-
-			ArticleResponse lastArticle = enrichedResponses.get(enrichedResponses.size() - 1);
-
-			if (sortBy == ArticleSortType.VIEW_COUNT) {
-				nextAfterString = String.valueOf(lastArticle.viewCount() != null ? lastArticle.viewCount() : 0);
-			} else {
-				nextAfterString = String.valueOf(lastArticle.commentCount() != null ? lastArticle.commentCount() : 0);
-			}
 		}
 
 		if (finalContentList.isEmpty()
@@ -156,8 +149,7 @@ public class ArticleService {
 		return new CursorPageResponseArticleDto(
 			finalContentList,
 			nextCursor,
-			nextAfterString != null ? nextAfterString :
-				(request.after() != null ? request.after().toString() : null),
+			nextAfterString,
 			requestedSize,
 			hasNext,
 			totalElements

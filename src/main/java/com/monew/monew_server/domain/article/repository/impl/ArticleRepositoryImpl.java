@@ -6,9 +6,8 @@ import static com.monew.monew_server.domain.comment.entity.QComment.*;
 import static com.monew.monew_server.domain.interest.entity.QArticleInterest.*;
 
 import java.time.Instant;
-import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -36,9 +35,10 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 
 	@Override
 	public List<Article> findArticlesWithFilterAndCursor(ArticleRequest request, int size) {
-		ArticleSortType sortBy = request.sortBy() == null ? ArticleSortType.DATE : request.sortBy();
+		ArticleSortType orderBy = parseSortType(request.orderBy());
+		String direction = Optional.ofNullable(request.direction()).orElse("DESC").toUpperCase();
 
-		BooleanExpression cursorCondition = whereCursor(request, sortBy);
+		BooleanExpression cursorCondition = whereCursor(request, orderBy, direction);
 		BooleanBuilder commonCondition = whereCondition(request);
 
 		JPQLQuery<Article> query = queryFactory.selectFrom(article)
@@ -46,16 +46,23 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 			.where(cursorCondition, commonCondition)
 			.groupBy(article.id);
 
-		OrderSpecifier<?> orderSpecifier;
-		if (sortBy == ArticleSortType.VIEW_COUNT) {
-			orderSpecifier = articleView.id.count().desc();
-			query = query.orderBy(orderSpecifier, article.publishDate.desc(), article.id.desc());
-		} else if (sortBy == ArticleSortType.COMMENT_COUNT) {
-			orderSpecifier = getCountExpression(ArticleSortType.COMMENT_COUNT).desc();
-			query = query.orderBy(orderSpecifier, article.publishDate.desc(), article.id.desc());
+		OrderSpecifier<?> primaryOrder;
+		OrderSpecifier<?> tieBreaker;
+
+		if (orderBy == ArticleSortType.VIEW_COUNT) {
+			NumberExpression<Long> countExpr = getCountExpression(ArticleSortType.VIEW_COUNT);
+			primaryOrder = direction.equals("ASC") ? countExpr.asc() : countExpr.desc();
+			tieBreaker = article.publishDate.desc();
+		} else if (orderBy == ArticleSortType.COMMENT_COUNT) {
+			NumberExpression<Long> countExpr = getCountExpression(ArticleSortType.COMMENT_COUNT);
+			primaryOrder = direction.equals("ASC") ? countExpr.asc() : countExpr.desc();
+			tieBreaker = article.publishDate.desc();
 		} else {
-			query = query.orderBy(article.publishDate.desc(), article.id.desc());
+			primaryOrder = direction.equals("ASC") ? article.publishDate.asc() : article.publishDate.desc();
+			tieBreaker = direction.equals("ASC") ? article.id.asc() : article.id.desc();
 		}
+
+		query.orderBy(primaryOrder, tieBreaker);
 
 		return query.limit(size).fetch();
 	}
@@ -68,7 +75,7 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 			.from(article)
 			.where(condition);
 
-		if (request.interestIds() != null && !request.interestIds().isEmpty()) {
+		if (request.interestId() != null) {
 			query.innerJoin(articleInterest).on(articleInterest.article.eq(article));
 		}
 
@@ -82,93 +89,101 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 			builder.and(article.title.containsIgnoreCase(request.keyword())
 				.or(article.summary.containsIgnoreCase(request.keyword())));
 		}
-
-		if (request.interestIds() != null && !request.interestIds().isEmpty()) {
-			builder.and(articleInterest.interest.id.in(request.interestIds()));
+		if (request.interestId() != null) {
+			builder.and(articleInterest.interest.id.eq(request.interestId()));
+		}
+		if (request.sourceIn() != null && !request.sourceIn().isEmpty()) {
+			List<ArticleSource> validSources = request.sourceIn().stream()
+				.map(String::toUpperCase)
+				.filter(ArticleSource::isValid)
+				.map(ArticleSource::valueOf)
+				.toList();
+			builder.and(article.source.in(validSources));
 		}
 
-		if (request.source() != null) {
-			try {
-				ArticleSource source = ArticleSource.valueOf(request.source().toString());
-				builder.and(article.source.eq(source));
-			} catch (IllegalArgumentException e) {
-				System.err.println("유효하지 않은 ArticleSource 값: " + request.source());
-			}
-		}
-
-		if (request.date() != null) {
-			LocalDate localDate = request.date();
-			Instant startOfDay = localDate.atStartOfDay().toInstant(ZoneOffset.UTC);
-			Instant endOfDay = localDate.atTime(23, 59, 59, 999999999).toInstant(ZoneOffset.UTC);
-			builder.and(article.publishDate.between(startOfDay, endOfDay));
+		if (request.publishDateFrom() != null && request.publishDateTo() != null) {
+			Instant from = request.publishDateFrom().toInstant(ZoneOffset.UTC);
+			Instant to = request.publishDateTo().toInstant(ZoneOffset.UTC);
+			builder.and(article.publishDate.between(from, to));
+		} else if (request.publishDateFrom() != null) {
+			Instant from = request.publishDateFrom().toInstant(ZoneOffset.UTC);
+			builder.and(article.publishDate.goe(from));
+		} else if (request.publishDateTo() != null) {
+			Instant to = request.publishDateTo().toInstant(ZoneOffset.UTC);
+			builder.and(article.publishDate.loe(to));
 		}
 
 		builder.and(article.deletedAt.isNull());
-
 		return builder;
 	}
 
-	private BooleanExpression whereCursor(ArticleRequest request, ArticleSortType sortBy) {
-
-		if (request.cursor() == null || request.cursor().isBlank() || request.nextAfter() == null || request.nextAfter()
-			.isBlank()) {
+	private BooleanExpression whereCursor(ArticleRequest request, ArticleSortType orderBy, String direction) {
+		if (request.cursor() == null || request.cursor().isBlank() || request.after() == null) {
 			return null;
 		}
 
-		UUID nextCursorId;
-		String nextAfterString = request.nextAfter();
+		UUID cursorId = UUID.fromString(request.cursor());
+		LocalDateTime after = request.after();
+		Instant afterInstant = after.toInstant(ZoneOffset.UTC);
 
-		try {
-			nextCursorId = UUID.fromString(request.cursor());
+		BooleanExpression primarySort;
+		BooleanExpression tieBreaker;
 
-			if (sortBy == ArticleSortType.DATE) {
-				Instant nextAfterInstant = Instant.parse(nextAfterString);
-
-				BooleanExpression primarySort = article.publishDate.lt(nextAfterInstant);
-
-				BooleanExpression tieBreaker = article.publishDate.eq(nextAfterInstant)
-					.and(article.id.lt(nextCursorId));
-
-				return primarySort.or(tieBreaker);
-
-			} else if (sortBy == ArticleSortType.COMMENT_COUNT || sortBy == ArticleSortType.VIEW_COUNT) {
-
-				Long nextAfterValue = Long.parseLong(nextAfterString);
-
-				NumberExpression<Long> countExpression = getCountExpression(sortBy);
-
-				BooleanExpression primarySort = countExpression.lt(nextAfterValue);
-
-				BooleanExpression tieBreaker = countExpression.eq(nextAfterValue)
-					.and(article.id.lt(nextCursorId));
-
-				return primarySort.or(tieBreaker);
+		if (orderBy == ArticleSortType.DATE) {
+			if (direction.equals("ASC")) {
+				primarySort = article.publishDate.gt(afterInstant);
+				tieBreaker = article.publishDate.eq(afterInstant).and(article.id.gt(cursorId));
+			} else {
+				primarySort = article.publishDate.lt(afterInstant);
+				tieBreaker = article.publishDate.eq(afterInstant).and(article.id.lt(cursorId));
+			}
+			return primarySort.or(tieBreaker);
+		} else {
+			Long afterValue = 0L;
+			try {
+				afterValue = Long.parseLong(after.toString());
+			} catch (NumberFormatException ignored) {
 			}
 
-		} catch (IllegalArgumentException | DateTimeParseException e) {
-			System.err.println("커서 값 파싱 에러: " + e.getMessage());
-			return article.id.isNull();
-		}
+			NumberExpression<Long> countExpr = getCountExpression(orderBy);
 
-		return null;
+			if (direction.equals("ASC")) {
+				primarySort = countExpr.gt(afterValue);
+				tieBreaker = countExpr.eq(afterValue).and(article.id.gt(cursorId));
+			} else {
+				primarySort = countExpr.lt(afterValue);
+				tieBreaker = countExpr.eq(afterValue).and(article.id.lt(cursorId));
+			}
+			return primarySort.or(tieBreaker);
+		}
 	}
 
-	private NumberExpression<Long> getCountExpression(ArticleSortType sortBy) {
+	private NumberExpression<Long> getCountExpression(ArticleSortType orderBy) {
 		JPQLQuery<Long> countQuery;
 
-		if (sortBy == ArticleSortType.COMMENT_COUNT) {
+		if (orderBy == ArticleSortType.COMMENT_COUNT) {
 			countQuery = JPAExpressions.select(comment.id.count())
 				.from(comment)
 				.where(comment.article.id.eq(article.id).and(comment.deletedAt.isNull()));
-		} else if (sortBy == ArticleSortType.VIEW_COUNT) {
+		} else if (orderBy == ArticleSortType.VIEW_COUNT) {
 			countQuery = JPAExpressions.select(articleView.id.count())
 				.from(articleView)
 				.where(articleView.article.id.eq(article.id));
 		} else {
-			return (NumberExpression<Long>)Expressions.constant(0L); // 기본값
+			return Expressions.numberTemplate(Long.class, "0");
 		}
 
 		return Expressions.numberTemplate(Long.class, "({0})", countQuery);
+	}
+
+	private ArticleSortType parseSortType(String orderBy) {
+		if (orderBy == null)
+			return ArticleSortType.DATE;
+		try {
+			return ArticleSortType.valueOf(orderBy.toUpperCase());
+		} catch (IllegalArgumentException e) {
+			return ArticleSortType.DATE;
+		}
 	}
 
 	@Override
@@ -189,6 +204,25 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 					.and(article.deletedAt.isNull()))
 				.fetchOne()
 		);
+	}
+
+	@Override
+	public List<Article> findBySourceInAndSourceUrlIn(
+		List<ArticleSource> sources,
+		List<String> sourceUrls) {
+
+		if (sources.isEmpty() || sourceUrls.isEmpty()) {
+			return List.of();
+		}
+
+		return queryFactory
+			.selectFrom(article)
+			.where(
+				article.source.in(sources)
+					.and(article.sourceUrl.in(sourceUrls))
+					.and(article.deletedAt.isNull())
+			)
+			.fetch();
 	}
 
 }

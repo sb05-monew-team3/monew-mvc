@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
- import com.monew.monew_server.domain.comment.entity.Comment;
+import com.monew.monew_server.domain.comment.entity.Comment;
 import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
 import com.monew.monew_server.domain.notification.dto.NotificationDto;
 import com.monew.monew_server.domain.notification.entity.Notification;
@@ -16,7 +16,7 @@ import com.monew.monew_server.domain.notification.mapper.NotificationMapper;
 import com.monew.monew_server.domain.notification.repository.NotificationRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
-import com.monew.monew_server.domain.notification.exception.NotificationNotFoundException;
+import com.monew.monew_server.exception.NotificationNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

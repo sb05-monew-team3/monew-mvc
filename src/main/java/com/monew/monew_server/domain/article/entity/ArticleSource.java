@@ -9,5 +9,14 @@ public enum ArticleSource {
 	NAVER,
 	HANKYUNG,
 	CHOSUN,
-	YEONHAP
+	YEONHAP;
+
+	public static boolean isValid(String s) {
+		try {
+			valueOf(s);
+			return true;
+		} catch (IllegalArgumentException e) {
+			return false;
+		}
+	}
 }

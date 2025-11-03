@@ -5,6 +5,7 @@ import com.monew.monew_server.domain.comment.entity.Comment;
 import com.monew.monew_server.domain.comment.entity.CommentLike;
 import com.monew.monew_server.domain.comment.repository.CommentLikeRepository;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
+import com.monew.monew_server.domain.notification.service.NotificationService;
 import com.monew.monew_server.domain.user.entity.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
@@ -23,6 +24,7 @@ public class CommentLikeService {
     private final CommentLikeRepository commentLikeRepository;
     private final CommentRepository commentRepository;
     private final EntityManager entityManager;
+    private final NotificationService notificationService;
 
     @Transactional
     public CommentLikeDto addLike(UUID commentId, UUID userId) {
@@ -55,10 +57,14 @@ public class CommentLikeService {
         CommentLike savedLike = commentLikeRepository.save(commentLike);
         log.info("좋아요 추가 완료: likeId={}", savedLike.getId());
 
-        // 7. 현재 좋아요 개수 조회
+        // 7. 알림 생성 (댓글 작성자에게 알림 전송, 본인 체크는 NotificationService에서 처리)
+        notificationService.createCommentLikeNotification(comment, userId);
+        log.info("알림 생성 요청 완료: commentId={}, likedBy={}", comment.getId(), userId);
+
+        // 8. 현재 좋아요 개수 조회
         long likeCount = commentLikeRepository.countByComment_Id(commentId);
 
-        // 8. 응답 DTO 생성 (Swagger 명세에 맞춰 댓글 정보도 함께 반환)
+        // 9. 응답 DTO 생성 (Swagger 명세에 맞춰 댓글 정보도 함께 반환)
         return CommentLikeDto.builder()
                 .id(savedLike.getId())
                 .likedBy(userId)

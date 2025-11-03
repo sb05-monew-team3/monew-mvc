@@ -340,4 +340,65 @@ class InterestQueryRepositoryImplTest {
             .hasMessageContaining("invalid cursor: not-a-number")
             .hasRootCauseInstanceOf(IllegalArgumentException.class);
     }
+
+    @Test
+    @DisplayName("findAll: 'after'가 null이고 'cursor'만 있으면 1페이지로 동작")
+    void findAll_WhenAfterIsNull_ShouldActAsPage1() {
+        // given
+        // 2페이지 커서("React")가 있지만, after(createdAt)가 null
+        InterestQuery query = new InterestQuery(
+            null, "name", "DESC", "React", null, 2, null, null
+        );
+
+        // when
+        // buildRangeFromCursor가 (after == null) 조건 때문에 null을 반환해야 함
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then
+        // 2페이지(Java, Docker)가 아닌 1페이지(Spring, React)가 나와야 함
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content().get(0).name()).isEqualTo("Spring");
+        assertThat(response.content().get(1).name()).isEqualTo("React");
+        assertThat(response.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("findAll: 'cursor'가 null이고 'after'만 있으면 1페이지로 동작")
+    void findAll_WhenCursorIsNull_ShouldActAsPage1() {
+        // given
+        // 2페이지 after(iReact.getCreatedAt())가 있지만, cursor가 null
+        InterestQuery query = new InterestQuery(
+            null, "name", "DESC", null, iReact.getCreatedAt(), 2, null, null
+        );
+
+        // when
+        // buildRangeFromCursor가 (!hasText(cursor)) 조건 때문에 null을 반환해야 함
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then
+        // 1페이지(Spring, React)가 나와야 함
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content().get(0).name()).isEqualTo("Spring");
+        assertThat(response.content().get(1).name()).isEqualTo("React");
+    }
+
+    @Test
+    @DisplayName("findAll: 'cursor'가 빈 문자열이면 1페이지로 동작")
+    void findAll_WhenCursorIsEmptyString_ShouldActAsPage1() {
+        // given
+        // 2페이지 after(iReact.getCreatedAt())가 있지만, cursor가 "" (empty string)
+        InterestQuery query = new InterestQuery(
+            null, "name", "DESC", "", iReact.getCreatedAt(), 2, null, null
+        );
+
+        // when
+        // buildRangeFromCursor가 (!hasText(cursor)) 조건 때문에 null을 반환해야 함
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then
+        // 1페이지(Spring, React)가 나와야 함
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content().get(0).name()).isEqualTo("Spring");
+        assertThat(response.content().get(1).name()).isEqualTo("React");
+    }
 }

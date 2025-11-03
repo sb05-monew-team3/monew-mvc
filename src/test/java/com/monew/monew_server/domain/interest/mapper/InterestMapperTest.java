@@ -5,111 +5,135 @@ import static org.assertj.core.api.Assertions.assertThat;
 import com.monew.monew_server.domain.interest.dto.InterestDto;
 import com.monew.monew_server.domain.interest.entity.Interest;
 import java.util.List;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.test.context.ContextConfiguration;
-import org.springframework.test.context.junit.jupiter.SpringExtension;
 
-@ExtendWith(SpringExtension.class)
-@ContextConfiguration(classes = {InterestMapperImpl.class})
 class InterestMapperTest {
 
-    @Autowired
     private InterestMapper interestMapper;
 
-    @Test
-    @DisplayName("toDto: 모든 필드가 정상적으로 DTO에 매핑되어야 한다 (Happy Path)")
-    void toDto_shouldMapAllFieldsCorrectly() {
-        Interest interest = Interest.builder().name("Spring").build();
-        List<String> keywords = List.of("k1", "k2");
-        Long subscriberCount = 10L;
-        Boolean subscribedByMe = true;
-
-        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, subscribedByMe);
-
-        assertThat(dto).isNotNull();
-        assertThat(dto.id()).isEqualTo(interest.getId());
-        assertThat(dto.name()).isEqualTo("Spring");
-        assertThat(dto.keywords()).isEqualTo(keywords);
-        assertThat(dto.keywords()).isNotSameAs(keywords);
-        assertThat(dto.subscriberCount()).isEqualTo(10L);
-        assertThat(dto.subscribedByMe()).isTrue();
+    @BeforeEach
+    void setUp() {
+        interestMapper = new InterestMapperImpl();
     }
 
     @Test
-    @DisplayName("toDto: 모든 입력 파라미터가 null일 때 null을 반환해야 한다")
-    void toDto_shouldReturnNull_whenAllInputsAreNull() {
-        InterestDto dto = interestMapper.toDto(null, null, null, null);
+    @DisplayName("모든 파라미터가 null일 경우 null을 반환해야 함")
+    void testToDto_WhenAllInputsAreNull() {
+        // given
+        Interest interest = null;
+        List<String> keywords = null;
+        Long subscriberCount = null;
+        Boolean subscribedByMe = null;
 
+        // when
+        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, subscribedByMe);
+
+        // then
+        // Branch 1 (True): if ( interest == null && keywords == null && ... )
         assertThat(dto).isNull();
     }
 
     @Test
-    @DisplayName("toDto: Interest 객체만 null일 때, DTO의 id와 name은 null이어야 한다")
-    void toDto_shouldHandleNullInterest() {
-        List<String> keywords = List.of("k1");
-        Long subscriberCount = 5L;
+    @DisplayName("모든 파라미터가 제공될 경우 DTO로 정상 매핑되어야 함 (Happy Path)")
+    void testToDto_WhenAllInputsAreProvided() {
+        // given
+        UUID interestId = UUID.randomUUID();
+        Interest interest = Interest.builder().id(interestId).name("Spring Boot").build();
+        List<String> keywords = List.of("java", "backend");
+        Long subscriberCount = 100L;
+        Boolean subscribedByMe = true;
+
+        // when
+        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, subscribedByMe);
+
+        // then
+        // Branch 1 (False): 최소 하나가 null이 아님
+        // Branch 2 (True): interest != null
+        // Branch 3 (True): keywords != null
+        assertThat(dto).isNotNull();
+        assertThat(dto.id()).isEqualTo(interestId);
+        assertThat(dto.name()).isEqualTo("Spring Boot");
+        assertThat(dto.keywords()).isEqualTo(keywords);
+        assertThat(dto.subscriberCount()).isEqualTo(subscriberCount);
+        assertThat(dto.subscribedByMe()).isEqualTo(subscribedByMe);
+
+        // keywords 리스트가 원본과 다른 새 인스턴스인지 확인 (방어적 복사)
+        assertThat(dto.keywords()).isNotSameAs(keywords);
+    }
+
+    @Test
+    @DisplayName("Interest 객체만 null일 경우 ID와 Name이 null로 매핑되어야 함")
+    void testToDto_WhenInterestIsNull() {
+        // given
+        Interest interest = null;
+        List<String> keywords = List.of("react", "frontend");
+        Long subscriberCount = 50L;
         Boolean subscribedByMe = false;
 
-        InterestDto dto = interestMapper.toDto(null, keywords, subscriberCount, subscribedByMe);
+        // when
+        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, subscribedByMe);
 
+        // then
+        // Branch 1 (False)
+        // Branch 2 (False): interest == null
+        // Branch 3 (True): keywords != null
         assertThat(dto).isNotNull();
         assertThat(dto.id()).isNull();
         assertThat(dto.name()).isNull();
         assertThat(dto.keywords()).isEqualTo(keywords);
-        assertThat(dto.subscriberCount()).isEqualTo(5L);
-        assertThat(dto.subscribedByMe()).isFalse();
+        assertThat(dto.subscriberCount()).isEqualTo(subscriberCount);
+        assertThat(dto.subscribedByMe()).isEqualTo(subscribedByMe);
     }
 
     @Test
-    @DisplayName("toDto: keywords 리스트가 null일 때, DTO의 keywords는 null이어야 한다")
-    void toDto_shouldHandleNullKeywords() {
-        Interest interest = Interest.builder().name("Java").build();
-
-        InterestDto dto = interestMapper.toDto(interest, null, 5L, true);
-
-        assertThat(dto).isNotNull();
-        assertThat(dto.name()).isEqualTo("Java");
-        assertThat(dto.keywords()).isNull();
-        assertThat(dto.subscriberCount()).isEqualTo(5L);
-        assertThat(dto.subscribedByMe()).isTrue();
-    }
-
-    @Test
-    @DisplayName("toDto: subscriberCount가 null일 때, DTO의 subscriberCount는 null이어야 한다")
-    void toDto_shouldHandleNullSubscriberCount() {
-        Interest interest = Interest.builder().name("Java").build();
-
-        InterestDto dto = interestMapper.toDto(interest, List.of("k1"), null, true);
-
-        assertThat(dto).isNotNull();
-        assertThat(dto.name()).isEqualTo("Java");
-        assertThat(dto.keywords()).containsExactly("k1");
-        assertThat(dto.subscriberCount()).isNull();
-        assertThat(dto.subscribedByMe()).isTrue();
-    }
-
-    @Test
-    @DisplayName("toDto: subscribedByMe가 null일 때, DTO의 subscribedByMe는 null이어야 한다")
-    void toDto_shouldHandleNullSubscribedByMe() {
+    @DisplayName("Keywords 리스트만 null일 경우 Keywords가 null로 매핑되어야 함")
+    void testToDto_WhenKeywordsAreNull() {
         // given
-        // 다른 파라미터는 non-null로 설정하여
-        // "모든 파라미터 null" 분기를 피하게 함
-        Interest interest = Interest.builder().name("Java").build();
-        List<String> keywords = List.of("k1");
-        Long subscriberCount = 5L;
+        UUID interestId = UUID.randomUUID();
+        Interest interest = Interest.builder().id(interestId).name("Database").build();
+        List<String> keywords = null;
+        Long subscriberCount = 200L;
+        Boolean subscribedByMe = true;
 
         // when
-        // subscribedByMe 파라미터에 null 전달
-        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, null);
+        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, subscribedByMe);
 
         // then
+        // Branch 1 (False)
+        // Branch 2 (True): interest != null
+        // Branch 3 (False): keywords == null
         assertThat(dto).isNotNull();
-        assertThat(dto.name()).isEqualTo("Java");
-        assertThat(dto.keywords()).containsExactly("k1");
-        assertThat(dto.subscriberCount()).isEqualTo(5L);
-        assertThat(dto.subscribedByMe()).isNull(); // subscribedByMe가 null인지 확인
+        assertThat(dto.id()).isEqualTo(interestId);
+        assertThat(dto.name()).isEqualTo("Database");
+        assertThat(dto.keywords()).isNull();
+        assertThat(dto.subscriberCount()).isEqualTo(subscriberCount);
+        assertThat(dto.subscribedByMe()).isEqualTo(subscribedByMe);
+    }
+
+    @Test
+    @DisplayName("Interest와 Keywords가 모두 null일 경우 해당 필드들이 null로 매핑되어야 함")
+    void testToDto_WhenInterestAndKeywordsAreNull() {
+        // given
+        Interest interest = null;
+        List<String> keywords = null;
+        Long subscriberCount = 10L; // 이 값이 null이 아니므로 Branch 1은 False가 됨
+        Boolean subscribedByMe = false;
+
+        // when
+        InterestDto dto = interestMapper.toDto(interest, keywords, subscriberCount, subscribedByMe);
+
+        // then
+        // Branch 1 (False)
+        // Branch 2 (False): interest == null
+        // Branch 3 (False): keywords == null
+        assertThat(dto).isNotNull();
+        assertThat(dto.id()).isNull();
+        assertThat(dto.name()).isNull();
+        assertThat(dto.keywords()).isNull();
+        assertThat(dto.subscriberCount()).isEqualTo(subscriberCount);
+        assertThat(dto.subscribedByMe()).isEqualTo(subscribedByMe);
     }
 }

@@ -47,14 +47,9 @@ public class UserController {
 	@DeleteMapping("/{userId}")
 	public ResponseEntity<String> deleteUser(@PathVariable UUID userId) {
 		userService.deleteUser(userId);
-		return ResponseEntity.ok("회원이 삭제되었습니다.");
+		return ResponseEntity.ok("회원이 논리적으로 삭제되었습니다.");
 	}
 
-	@DeleteMapping("/{userId}/hard")
-	public ResponseEntity<String> hardDeleteUser(@PathVariable UUID userId){
-		userService.hardDeleteUser(userId);
-		return ResponseEntity.ok("회원의 데이터가 영구적으로 삭제되었습니다.");
-	}
 
 
 

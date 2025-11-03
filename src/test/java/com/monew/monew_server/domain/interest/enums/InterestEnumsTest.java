@@ -1,8 +1,7 @@
-package com.monew.monew_server.domain.interest;
+package com.monew.monew_server.domain.interest.enums;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.monew.monew_server.domain.interest.enums.InterestSortField;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 

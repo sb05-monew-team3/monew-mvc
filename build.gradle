@@ -83,10 +83,17 @@ tasks.named('test') {
 }
 
 jacocoTestReport {
-    dependsOn test
     reports {
         html.required = true
         xml.required = true
         csv.required = false
+    }
+
+    afterEvaluate {
+        classDirectories.setFrom(files(classDirectories.files.collect {
+            fileTree(dir: it, exclude: [
+                    "**/entity/Q*.class"
+            ])
+        }))
     }
 }

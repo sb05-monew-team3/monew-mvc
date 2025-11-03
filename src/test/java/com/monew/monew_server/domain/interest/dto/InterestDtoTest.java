@@ -1,12 +1,8 @@
-package com.monew.monew_server.domain.interest;
+package com.monew.monew_server.domain.interest.dto;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.monew.monew_server.domain.interest.dto.CursorPageResponseInterestDto;
-import com.monew.monew_server.domain.interest.dto.InterestDto;
-import com.monew.monew_server.domain.interest.dto.InterestQuery;
-import com.monew.monew_server.domain.interest.dto.InterestRegisterRequest;
 import com.monew.monew_server.domain.interest.enums.InterestSortField;
 import java.time.Instant;
 import java.util.List;
@@ -95,10 +91,10 @@ class InterestDtoTest {
     @DisplayName("데이터 DTOs: 생성자 및 Accessor 단순 호출 (커버리지용)")
     void dataDtos_constructorAndAccessor_coverage() {
         UUID id = UUID.randomUUID();
+        UUID interestId = UUID.randomUUID();
         Instant now = Instant.now();
         List<String> keywords = List.of("k1", "k2");
 
-        // InterestDto
         InterestDto interestDto = new InterestDto(id, "name", keywords, 10L, true);
         assertThat(interestDto.id()).isEqualTo(id);
         assertThat(interestDto.name()).isEqualTo("name");
@@ -106,7 +102,6 @@ class InterestDtoTest {
         assertThat(interestDto.subscriberCount()).isEqualTo(10L);
         assertThat(interestDto.subscribedByMe()).isTrue();
 
-        // CursorPageResponseInterestDto
         CursorPageResponseInterestDto pageDto = new CursorPageResponseInterestDto(
             List.of(interestDto), "cursor", now, 1, 100L, true
         );
@@ -117,9 +112,23 @@ class InterestDtoTest {
         assertThat(pageDto.totalElements()).isEqualTo(100L);
         assertThat(pageDto.hasNext()).isTrue();
 
-        // InterestRegisterRequest
         InterestRegisterRequest requestDto = new InterestRegisterRequest("request name", keywords);
         assertThat(requestDto.name()).isEqualTo("request name");
         assertThat(requestDto.keywords()).isEqualTo(keywords);
+
+        SubscriptionDto subDto = new SubscriptionDto(
+            id,
+            interestId,
+            "interest name",
+            keywords,
+            20L,
+            now
+        );
+        assertThat(subDto.id()).isEqualTo(id);
+        assertThat(subDto.interestId()).isEqualTo(interestId);
+        assertThat(subDto.interestName()).isEqualTo("interest name");
+        assertThat(subDto.interestKeywords()).isEqualTo(keywords);
+        assertThat(subDto.interestSubscriberCount()).isEqualTo(20L);
+        assertThat(subDto.createdAt()).isEqualTo(now);
     }
 }

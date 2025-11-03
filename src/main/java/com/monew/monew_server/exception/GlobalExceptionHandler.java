@@ -1,10 +1,9 @@
 package com.monew.monew_server.exception;
 
-import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-import lombok.extern.slf4j.Slf4j;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -13,6 +12,9 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import jakarta.servlet.http.HttpServletRequest;
+import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestControllerAdvice
@@ -38,10 +40,12 @@ public class GlobalExceptionHandler {
 	private HttpStatus determineHttpStatus(BaseException exception) {
 		ErrorCode errorCode = exception.getErrorCode();
 		return switch (errorCode) {
-			case INTEREST_NAME_DUPLICATION -> HttpStatus.CONFLICT;
 			case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
+			case ARTICLE_NOT_FOUND,
+				 INTEREST_NOT_FOUND,
+				 NOTIFICATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
+			case INTEREST_NAME_DUPLICATION -> HttpStatus.CONFLICT;
 			case INTERNAL_SERVER_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
-			case ARTICLE_NOT_FOUND -> HttpStatus.NOT_FOUND;
 		};
 	}
 
@@ -72,7 +76,7 @@ public class GlobalExceptionHandler {
 
 	@ExceptionHandler(MissingRequestHeaderException.class)
 	@ResponseStatus(HttpStatus.BAD_REQUEST)
-	public ErrorResponse handleInvalidJson(
+	public ErrorResponse handleMissingHeader(
 		MissingRequestHeaderException exception,
 		HttpServletRequest request
 	) {
@@ -83,5 +87,21 @@ public class GlobalExceptionHandler {
 			request.getRequestURI()
 		);
 		return new ErrorResponse(exception, HttpStatus.BAD_REQUEST.value());
+	}
+
+	@ExceptionHandler(NotFoundException.class)
+	@ResponseStatus(HttpStatus.NOT_FOUND)
+	public ErrorResponse handleNotFound(
+		NotFoundException exception,
+		HttpServletRequest request
+	) {
+		log.warn(
+			"Entity not found [404]: {} (Request: {} {})",
+			exception.getMessage(),
+			request.getMethod(),
+			request.getRequestURI()
+		);
+
+		return new ErrorResponse(exception, HttpStatus.NOT_FOUND.value());
 	}
 }

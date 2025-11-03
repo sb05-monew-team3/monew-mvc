@@ -15,4 +15,7 @@ public interface UserActivitySubscriptionRepository extends JpaRepository<Subscr
 
 	@EntityGraph(attributePaths = {"interest"})
 	List<Subscription> findTop10ByUser_IdOrderByCreatedAtDesc(UUID userId);
+
+	// 추가
+	long countByInterest_Id(UUID interestId);
 }

@@ -217,7 +217,7 @@ class ArticleServiceTest {
 
 	@Test
 	@DisplayName("Service - sortBy COMMENT_COUNT 처리 및 hasNext false")
-	void shouldHandleCommentCountSortWithNoNextPages() {
+	void shouldHandleCommentCountSortWithNoNextPage() {
 		UUID id1 = UUID.randomUUID();
 		UUID id2 = UUID.randomUUID();
 

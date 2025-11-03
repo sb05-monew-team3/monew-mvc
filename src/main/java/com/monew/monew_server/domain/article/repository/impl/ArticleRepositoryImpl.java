@@ -62,6 +62,7 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 		if (orderBy == ArticleSortType.VIEW_COUNT) {
 			NumberExpression<Long> countExpr = getCountExpression(ArticleSortType.VIEW_COUNT);
 			primaryOrder = direction.equals("ASC") ? countExpr.asc() : countExpr.desc();
+
 			secondaryOrder = direction.equals("ASC") ? article.publishDate.asc() : article.publishDate.desc();
 
 			log.info("Using VIEW_COUNT ordering: primary={}, secondary=publishDate {}",
@@ -153,6 +154,7 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 	}
 
 	private BooleanExpression whereCursor(ArticleRequest request, ArticleSortType orderBy, String direction) {
+		// cursor와 after 둘 다 있어야 커서 페이지네이션 적용
 		if (request.cursor() == null || request.cursor().isBlank() || request.after() == null) {
 			return null;
 		}
@@ -168,6 +170,7 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 		}
 
 		if (orderBy == ArticleSortType.DATE) {
+
 			Instant cursorInstant;
 			try {
 				cursorInstant = Instant.parse(request.cursor());
@@ -180,6 +183,7 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 				return article.publishDate.gt(cursorInstant)
 					.or(article.publishDate.eq(cursorInstant).and(tieBreaker));
 			} else {
+
 				return article.publishDate.lt(cursorInstant)
 					.or(article.publishDate.eq(cursorInstant).and(tieBreaker));
 			}

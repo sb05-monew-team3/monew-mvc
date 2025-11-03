@@ -360,5 +360,4 @@ public class ArticleService {
 		}
 		return results;
 	}
-
 }

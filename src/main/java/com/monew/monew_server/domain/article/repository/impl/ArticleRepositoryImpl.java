@@ -27,7 +27,9 @@ import com.querydsl.jpa.JPQLQuery;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @RequiredArgsConstructor
 public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 
@@ -38,33 +40,60 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 		ArticleSortType orderBy = parseSortType(request.orderBy());
 		String direction = Optional.ofNullable(request.direction()).orElse("DESC").toUpperCase();
 
+		log.info("=== Query Debug ===");
+		log.info("Request orderBy: {}", request.orderBy());
+		log.info("Parsed ArticleSortType: {}", orderBy);
+		log.info("Direction: {}", direction);
+
 		BooleanExpression cursorCondition = whereCursor(request, orderBy, direction);
 		BooleanBuilder commonCondition = whereCondition(request);
 
-		JPQLQuery<Article> query = queryFactory.selectFrom(article)
-			.leftJoin(articleView).on(articleView.article.eq(article))
-			.where(cursorCondition, commonCondition)
-			.groupBy(article.id);
+		JPQLQuery<Article> query = queryFactory.selectFrom(article);
+
+		if (request.interestId() != null) {
+			query.innerJoin(articleInterest).on(articleInterest.article.eq(article));
+		}
+
+		query.where(cursorCondition, commonCondition);
 
 		OrderSpecifier<?> primaryOrder;
-		OrderSpecifier<?> tieBreaker;
+		OrderSpecifier<?> secondaryOrder;
 
 		if (orderBy == ArticleSortType.VIEW_COUNT) {
 			NumberExpression<Long> countExpr = getCountExpression(ArticleSortType.VIEW_COUNT);
 			primaryOrder = direction.equals("ASC") ? countExpr.asc() : countExpr.desc();
-			tieBreaker = article.publishDate.desc();
+			secondaryOrder = direction.equals("ASC") ? article.publishDate.asc() : article.publishDate.desc();
+
+			log.info("Using VIEW_COUNT ordering: primary={}, secondary=publishDate {}",
+				direction, direction);
 		} else if (orderBy == ArticleSortType.COMMENT_COUNT) {
 			NumberExpression<Long> countExpr = getCountExpression(ArticleSortType.COMMENT_COUNT);
 			primaryOrder = direction.equals("ASC") ? countExpr.asc() : countExpr.desc();
-			tieBreaker = article.publishDate.desc();
+			secondaryOrder = direction.equals("ASC") ? article.publishDate.asc() : article.publishDate.desc();
+
+			log.info("Using COMMENT_COUNT ordering: primary={}, secondary=publishDate {}",
+				direction, direction);
 		} else {
 			primaryOrder = direction.equals("ASC") ? article.publishDate.asc() : article.publishDate.desc();
-			tieBreaker = direction.equals("ASC") ? article.id.asc() : article.id.desc();
+			secondaryOrder = direction.equals("ASC") ? article.id.asc() : article.id.desc();
+
+			log.info("Using DATE ordering: primary=publishDate {}, secondary=id {}",
+				direction, direction);
 		}
 
-		query.orderBy(primaryOrder, tieBreaker);
+		query.orderBy(primaryOrder, secondaryOrder);
 
-		return query.limit(size).fetch();
+		List<Article> results = query.limit(size).fetch();
+
+		log.info("Query returned {} articles", results.size());
+		if (!results.isEmpty()) {
+			Article first = results.get(0);
+			Article last = results.get(results.size() - 1);
+			log.info("First article: id={}, publishDate={}", first.getId(), first.getPublishDate());
+			log.info("Last article: id={}, publishDate={}", last.getId(), last.getPublishDate());
+		}
+
+		return results;
 	}
 
 	@Override
@@ -72,12 +101,13 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 		BooleanBuilder condition = whereCondition(request);
 
 		JPQLQuery<Long> query = queryFactory.select(article.id.countDistinct())
-			.from(article)
-			.where(condition);
+			.from(article);
 
 		if (request.interestId() != null) {
 			query.innerJoin(articleInterest).on(articleInterest.article.eq(article));
 		}
+
+		query.where(condition);
 
 		return query.fetchOne();
 	}
@@ -89,16 +119,21 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 			builder.and(article.title.containsIgnoreCase(request.keyword())
 				.or(article.summary.containsIgnoreCase(request.keyword())));
 		}
+
 		if (request.interestId() != null) {
 			builder.and(articleInterest.interest.id.eq(request.interestId()));
 		}
+
 		if (request.sourceIn() != null && !request.sourceIn().isEmpty()) {
 			List<ArticleSource> validSources = request.sourceIn().stream()
 				.map(String::toUpperCase)
 				.filter(ArticleSource::isValid)
 				.map(ArticleSource::valueOf)
 				.toList();
-			builder.and(article.source.in(validSources));
+
+			if (!validSources.isEmpty()) {
+				builder.and(article.source.in(validSources));
+			}
 		}
 
 		if (request.publishDateFrom() != null && request.publishDateTo() != null) {
@@ -122,39 +157,50 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 			return null;
 		}
 
-		UUID cursorId = UUID.fromString(request.cursor());
 		LocalDateTime after = request.after();
 		Instant afterInstant = after.toInstant(ZoneOffset.UTC);
 
-		BooleanExpression primarySort;
 		BooleanExpression tieBreaker;
+		if (direction.equals("ASC")) {
+			tieBreaker = article.publishDate.gt(afterInstant);
+		} else {
+			tieBreaker = article.publishDate.lt(afterInstant);
+		}
 
 		if (orderBy == ArticleSortType.DATE) {
-			if (direction.equals("ASC")) {
-				primarySort = article.publishDate.gt(afterInstant);
-				tieBreaker = article.publishDate.eq(afterInstant).and(article.id.gt(cursorId));
-			} else {
-				primarySort = article.publishDate.lt(afterInstant);
-				tieBreaker = article.publishDate.eq(afterInstant).and(article.id.lt(cursorId));
-			}
-			return primarySort.or(tieBreaker);
-		} else {
-			Long afterValue = 0L;
+			Instant cursorInstant;
 			try {
-				afterValue = Long.parseLong(after.toString());
-			} catch (NumberFormatException ignored) {
+				cursorInstant = Instant.parse(request.cursor());
+			} catch (Exception e) {
+				log.warn("Invalid cursor value for DATE sort: {}, ignoring cursor", request.cursor());
+				return null;
+			}
+
+			if (direction.equals("ASC")) {
+				return article.publishDate.gt(cursorInstant)
+					.or(article.publishDate.eq(cursorInstant).and(tieBreaker));
+			} else {
+				return article.publishDate.lt(cursorInstant)
+					.or(article.publishDate.eq(cursorInstant).and(tieBreaker));
+			}
+		} else {
+			long cursorCount;
+			try {
+				cursorCount = Long.parseLong(request.cursor());
+			} catch (NumberFormatException e) {
+				log.warn("Invalid cursor value for {} sort: {}, ignoring cursor", orderBy, request.cursor());
+				return null;
 			}
 
 			NumberExpression<Long> countExpr = getCountExpression(orderBy);
 
 			if (direction.equals("ASC")) {
-				primarySort = countExpr.gt(afterValue);
-				tieBreaker = countExpr.eq(afterValue).and(article.id.gt(cursorId));
+				return countExpr.gt(cursorCount)
+					.or(countExpr.eq(cursorCount).and(tieBreaker));
 			} else {
-				primarySort = countExpr.lt(afterValue);
-				tieBreaker = countExpr.eq(afterValue).and(article.id.lt(cursorId));
+				return countExpr.lt(cursorCount)
+					.or(countExpr.eq(cursorCount).and(tieBreaker));
 			}
-			return primarySort.or(tieBreaker);
 		}
 	}
 
@@ -177,11 +223,21 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 	}
 
 	private ArticleSortType parseSortType(String orderBy) {
-		if (orderBy == null)
+		if (orderBy == null || orderBy.isBlank()) {
 			return ArticleSortType.DATE;
+		}
+
+		String enumName = switch (orderBy.toLowerCase()) {
+			case "viewcount" -> "VIEW_COUNT";
+			case "commentcount" -> "COMMENT_COUNT";
+			case "publishdate", "date" -> "DATE";
+			default -> orderBy.toUpperCase();
+		};
+
 		try {
-			return ArticleSortType.valueOf(orderBy.toUpperCase());
+			return ArticleSortType.valueOf(enumName);
 		} catch (IllegalArgumentException e) {
+			log.warn("Invalid orderBy value: {}, using DATE as default", orderBy);
 			return ArticleSortType.DATE;
 		}
 	}

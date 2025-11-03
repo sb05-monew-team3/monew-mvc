@@ -24,10 +24,11 @@ public interface ArticleMapper {
 	default ArticleResponse toResponse(Article article, long viewCount, long commentCount, boolean viewedByMe) {
 		return new ArticleResponse(
 			article.getId(),
-			article.getTitle(),
-			article.getSummary(),
+			article.getSource(),
 			article.getSourceUrl(),
+			article.getTitle(),
 			article.getPublishDate(),
+			article.getSummary(),
 			commentCount,
 			viewCount,
 			viewedByMe

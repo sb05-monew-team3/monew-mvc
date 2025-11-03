@@ -19,7 +19,6 @@ import org.springframework.web.bind.annotation.RestController;
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
 import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
-import com.monew.monew_server.domain.article.dto.ArticleSourceDto;
 import com.monew.monew_server.domain.article.dto.CursorPageResponseArticleDto;
 import com.monew.monew_server.domain.article.service.ArticleService;
 
@@ -74,7 +73,7 @@ public class ArticleController {
 	}
 
 	@GetMapping("/sources")
-	public ResponseEntity<List<ArticleSourceDto>> getSources() {
+	public ResponseEntity<List<String>> getSources() {
 		log.info("GET /api/articles/sources");
 		return ResponseEntity.ok(articleService.getAllSources());
 	}

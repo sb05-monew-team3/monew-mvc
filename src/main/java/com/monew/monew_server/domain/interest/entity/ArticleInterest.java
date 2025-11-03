@@ -40,4 +40,11 @@ public class ArticleInterest extends BaseEntity {
 	@ManyToOne(fetch = FetchType.LAZY)
 	@JoinColumn(name = "interest_id", nullable = false)
 	private Interest interest;
+
+	public static ArticleInterest of(Article article, Interest interest) {
+		return ArticleInterest.builder()
+			.article(article)
+			.interest(interest)
+			.build();
+	}
 }

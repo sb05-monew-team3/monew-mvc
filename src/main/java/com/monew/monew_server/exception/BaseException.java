@@ -3,6 +3,7 @@ package com.monew.monew_server.exception;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
+
 import lombok.Getter;
 
 @Getter
@@ -12,7 +13,7 @@ public class BaseException extends RuntimeException {
 	private final Map<String, Object> details;
 
 	public BaseException(ErrorCode errorCode) {
-		super(errorCode.name());
+		super(errorCode.getMessage());
 		this.timestamp = Instant.now();
 		this.errorCode = errorCode;
 		this.details = new HashMap<>();

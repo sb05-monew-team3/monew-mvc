@@ -1,5 +1,6 @@
 package com.monew.monew_server.domain.user.dto;
 
+import java.time.Instant;
 import java.time.OffsetDateTime;
 import java.util.UUID;
 
@@ -17,6 +18,6 @@ public class UserDto {
 	private UUID id;
 	private String email;
 	private String nickname;
-	private OffsetDateTime createdAt;
+	private Instant createdAt;
 
 }

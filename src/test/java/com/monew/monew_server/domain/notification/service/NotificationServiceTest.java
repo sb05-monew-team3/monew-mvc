@@ -17,14 +17,18 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.monew.monew_server.domain.article.entity.Article;
+import com.monew.monew_server.domain.article.entity.ArticleSource;
+import com.monew.monew_server.domain.comment.entity.Comment;
 import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
 import com.monew.monew_server.domain.notification.dto.NotificationDto;
 import com.monew.monew_server.domain.notification.entity.Notification;
 import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
-import com.monew.monew_server.domain.notification.exception.NotificationNotFoundException;
 import com.monew.monew_server.domain.notification.mapper.NotificationMapper;
 import com.monew.monew_server.domain.notification.repository.NotificationRepository;
 import com.monew.monew_server.domain.user.entity.User;
+import com.monew.monew_server.domain.user.repository.UserRepository;
+import com.monew.monew_server.exception.NotificationNotFoundException;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("NotificationService 테스트")
@@ -34,12 +38,16 @@ class NotificationServiceTest {
 	private NotificationRepository notificationRepository;
 
 	@Mock
+	private UserRepository userRepository;
+
+	@Mock
 	private NotificationMapper notificationMapper;
 
 	@InjectMocks
 	private NotificationService notificationService;
 
 	private UUID userId;
+	private User user;
 	private UUID notificationId;
 	private Notification notification;
 	private NotificationDto notificationDto;
@@ -49,7 +57,7 @@ class NotificationServiceTest {
 		userId = UUID.randomUUID();
 		notificationId = UUID.randomUUID();
 
-		User user = User.builder()
+		user = User.builder()
 			.id(userId)
 			.build();
 
@@ -72,6 +80,69 @@ class NotificationServiceTest {
 			Instant.now(),
 			Instant.now()
 		);
+	}
+
+	@Test
+	@DisplayName("알림(댓글 좋아요) 생성 성공")
+	void createCommentLikeNotification() {
+		// Given
+		Article article = Article.builder()
+			.id(UUID.randomUUID())
+			.title("title")
+			.summary("summary")
+			.source(ArticleSource.NAVER)
+			.sourceUrl("http://test.com/")
+			.createdAt(Instant.now())
+			.publishDate(Instant.now())
+			.build();
+
+		User likedByUser = User.builder()
+			.id(UUID.randomUUID())
+			.nickname("좋아요누른사람")
+			.build();
+
+		Comment comment = Comment.builder()
+			.id(UUID.randomUUID())
+			.article(article)
+			.user(user)
+			.content("댓글")
+			.build();
+
+		given(userRepository.getReferenceById(likedByUser.getId())).willReturn(likedByUser);
+
+		given(notificationRepository.save(any(Notification.class)))
+			.willAnswer(invocation -> invocation.getArgument(0));
+
+		// When
+		notificationService.createCommentLikeNotification(comment, likedByUser.getId());
+
+		// Then
+		verify(userRepository).getReferenceById(likedByUser.getId());
+		verify(notificationRepository).save(argThat(notification ->
+			notification.getUser().getId().equals(userId) &&
+				notification.getResourceType() == NotificationResourceType.COMMENT &&
+				notification.getResourceId().equals(comment.getId()) &&
+				!notification.isConfirmed() &&
+				notification.getContent().contains(likedByUser.getNickname())
+		));
+	}
+
+	@Test
+	@DisplayName("알림(댓글 좋아요) 셀프 - 알림 생성 안 됨")
+	void createCommentLikeNotificationSelf() {
+		// Given
+		Comment comment = Comment.builder()
+			.id(UUID.randomUUID())
+			.user(user)
+			.content("댓글")
+			.build();
+
+		// when
+		notificationService.createCommentLikeNotification(comment, userId);
+
+		// then
+		verify(userRepository, never()).getReferenceById(any());
+		verify(notificationRepository, never()).save(any());
 	}
 
 	@Test

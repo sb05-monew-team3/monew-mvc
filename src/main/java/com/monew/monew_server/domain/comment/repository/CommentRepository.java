@@ -12,7 +12,7 @@ import com.monew.monew_server.domain.article.repository.projection.CommentCountP
 import com.monew.monew_server.domain.comment.entity.Comment;
 
 @Repository
-public interface CommentRepository extends JpaRepository<Comment, UUID> {
+public interface CommentRepository extends JpaRepository<Comment, UUID>, CommentRepositoryCustom {
 
 	List<Comment> findByArticle_Id(UUID articleId);
 

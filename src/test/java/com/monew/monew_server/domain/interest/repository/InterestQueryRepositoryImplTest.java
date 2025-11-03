@@ -49,8 +49,10 @@ class InterestQueryRepositoryImplTest {
     @Autowired private UserRepository userRepository;
     @Autowired private EntityManager entityManager;
 
-    private User user1, user2;
-    private Interest iReact, iJava, iSpring, iDocker;
+    private User user1;
+    private Interest iReact;
+    private Interest iJava;
+    private Interest iSpring;
 
     /**
      * 테스트 데이터 설정:
@@ -74,7 +76,7 @@ class InterestQueryRepositoryImplTest {
             .password("test1234!")
             .build()
         );
-        user2 = userRepository.save(User.builder()
+        User user2 = userRepository.save(User.builder()
             .email("test2@test.com")
             .nickname("test2")
             .password("test1234!")
@@ -88,7 +90,7 @@ class InterestQueryRepositoryImplTest {
         Thread.sleep(10);
         iSpring = interestRepository.save(Interest.builder().name("Spring").build());  // 1 sub
         Thread.sleep(10);
-        iDocker = interestRepository.save(Interest.builder().name("Docker").build());  // 0 subs (React보다 최신)
+        interestRepository.save(Interest.builder().name("Docker").build());  // 0 subs (React보다 최신)
 
         // 3. 키워드 생성
         interestKeywordRepository.save(InterestKeyword.builder().name("Boot").interest(iSpring).build());
@@ -209,6 +211,53 @@ class InterestQueryRepositoryImplTest {
         assertThat(response.hasNext()).isTrue();
     }
 
+    @Test
+    @DisplayName("findAll: 2페이지 조회 (이름 ASC, 커서 사용)")
+    void findAll_Page2_NameAsc_WithCursor() {
+        // given: 이름 ASC 정렬: Docker -> Java -> React -> Spring
+        // 1페이지(limit 2)는 Docker, Java.
+        // 1페이지의 마지막(Java) 정보를 커서로 사용
+        InterestQuery query = new InterestQuery(
+            null, "name", "ASC", "Java", iJava.getCreatedAt(), 2, null, null
+        );
+
+        // when
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then: 마지막 페이지
+        assertThat(response.totalElements()).isEqualTo(4);
+        assertThat(response.hasNext()).isFalse();
+        assertThat(response.content()).hasSize(2);
+        // 2페이지: React -> Spring
+        assertThat(response.content().get(0).name()).isEqualTo("React");
+        assertThat(response.content().get(1).name()).isEqualTo("Spring");
+    }
+
+    @Test
+    @DisplayName("findAll: 2페이지 조회 (구독자순 ASC, 커서 사용)")
+    void findAll_Page2_SubCountAsc_WithCursor() {
+        // given: 구독자순 ASC: Docker(0, 최신) -> React(0, 이전) -> Spring(1) -> Java(2)
+        // (0개짜리 Tie-breaker는 createdAt DESC이므로, createdAt이 느린(최신) Docker가 먼저 옴)
+        // 1페이지(limit 2)는 React, Docker.
+        // 1페이지의 마지막(Docker) 정보를 커서로 사용
+        InterestQuery query = new InterestQuery(
+            null, "subscriberCount", "ASC", "0", iReact.getCreatedAt(), 2, null, null
+        );
+
+        // when
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then: 마지막 페이지
+        assertThat(response.totalElements()).isEqualTo(4);
+        assertThat(response.hasNext()).isFalse();
+        assertThat(response.content()).hasSize(2);
+        // 2페이지: Spring(1) -> Java(2)
+        assertThat(response.content().get(0).name()).isEqualTo("Spring");
+        assertThat(response.content().get(1).name()).isEqualTo("Java");
+        assertThat(response.content().get(0).subscriberCount()).isEqualTo(1L);
+        assertThat(response.content().get(1).subscriberCount()).isEqualTo(2L);
+    }
+
     // --- 3. 필터링(buildKeywordFilter) 테스트 ---
 
     @Test
@@ -286,11 +335,70 @@ class InterestQueryRepositoryImplTest {
         );
 
         // when & then (IllegalArgumentException 분기 커버)
-        assertThatThrownBy(() -> {
-            interestQueryRepository.findAll(query, user1.getId());
-        })
+        assertThatThrownBy(() -> interestQueryRepository.findAll(query, user1.getId()))
             .isInstanceOf(InvalidDataAccessApiUsageException.class)
             .hasMessageContaining("invalid cursor: not-a-number")
             .hasRootCauseInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    @DisplayName("findAll: 'after'가 null이고 'cursor'만 있으면 1페이지로 동작")
+    void findAll_WhenAfterIsNull_ShouldActAsPage1() {
+        // given
+        // 2페이지 커서("React")가 있지만, after(createdAt)가 null
+        InterestQuery query = new InterestQuery(
+            null, "name", "DESC", "React", null, 2, null, null
+        );
+
+        // when
+        // buildRangeFromCursor가 (after == null) 조건 때문에 null을 반환해야 함
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then
+        // 2페이지(Java, Docker)가 아닌 1페이지(Spring, React)가 나와야 함
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content().get(0).name()).isEqualTo("Spring");
+        assertThat(response.content().get(1).name()).isEqualTo("React");
+        assertThat(response.hasNext()).isTrue();
+    }
+
+    @Test
+    @DisplayName("findAll: 'cursor'가 null이고 'after'만 있으면 1페이지로 동작")
+    void findAll_WhenCursorIsNull_ShouldActAsPage1() {
+        // given
+        // 2페이지 after(iReact.getCreatedAt())가 있지만, cursor가 null
+        InterestQuery query = new InterestQuery(
+            null, "name", "DESC", null, iReact.getCreatedAt(), 2, null, null
+        );
+
+        // when
+        // buildRangeFromCursor가 (!hasText(cursor)) 조건 때문에 null을 반환해야 함
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then
+        // 1페이지(Spring, React)가 나와야 함
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content().get(0).name()).isEqualTo("Spring");
+        assertThat(response.content().get(1).name()).isEqualTo("React");
+    }
+
+    @Test
+    @DisplayName("findAll: 'cursor'가 빈 문자열이면 1페이지로 동작")
+    void findAll_WhenCursorIsEmptyString_ShouldActAsPage1() {
+        // given
+        // 2페이지 after(iReact.getCreatedAt())가 있지만, cursor가 "" (empty string)
+        InterestQuery query = new InterestQuery(
+            null, "name", "DESC", "", iReact.getCreatedAt(), 2, null, null
+        );
+
+        // when
+        // buildRangeFromCursor가 (!hasText(cursor)) 조건 때문에 null을 반환해야 함
+        CursorPageResponseInterestDto response = interestQueryRepository.findAll(query, user1.getId());
+
+        // then
+        // 1페이지(Spring, React)가 나와야 함
+        assertThat(response.content()).hasSize(2);
+        assertThat(response.content().get(0).name()).isEqualTo("Spring");
+        assertThat(response.content().get(1).name()).isEqualTo("React");
     }
 }

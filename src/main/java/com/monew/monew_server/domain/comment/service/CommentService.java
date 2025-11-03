@@ -3,7 +3,10 @@ import com.monew.monew_server.domain.article.entity.Article;
 import com.monew.monew_server.domain.comment.dto.CommentDto;
 import com.monew.monew_server.domain.comment.dto.CommentRegisterRequest;
 import com.monew.monew_server.domain.comment.dto.CommentUpdateRequest;
+import com.monew.monew_server.domain.comment.dto.CursorPageResponse;
 import com.monew.monew_server.domain.comment.entity.Comment;
+import com.monew.monew_server.domain.comment.entity.CommentLike;
+import com.monew.monew_server.domain.comment.repository.CommentLikeRepository;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import jakarta.persistence.EntityManager;
@@ -14,7 +17,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -24,6 +30,7 @@ import java.util.stream.Collectors;
 public class CommentService {
 
     private final CommentRepository commentRepository;
+    private final CommentLikeRepository commentLikeRepository;
     private final EntityManager entityManager;
 
     @Transactional
@@ -31,22 +38,18 @@ public class CommentService {
         log.info("댓글 생성 요청: articleId={}, userId={}",
                 request.getArticleId(), request.getUserId());
 
-        // 1. Article과 User 참조 가져오기 (프록시 객체)
         Article article = entityManager.getReference(Article.class, request.getArticleId());
         User user = entityManager.getReference(User.class, request.getUserId());
 
-        // 2. Comment 엔티티 생성
         Comment comment = Comment.builder()
                 .article(article)
                 .user(user)
                 .content(request.getContent())
                 .build();
 
-        // 3. DB에 저장
         Comment savedComment = commentRepository.save(comment);
         log.info("댓글 생성 완료: commentId={}", savedComment.getId());
 
-        // 4. 엔티티를 DTO로 변환시킨다.
         return convertToDto(savedComment);
     }
 
@@ -63,22 +66,102 @@ public class CommentService {
                 .build();
     }
 
-    // 댓글 조회
     @Transactional(readOnly = true)
-    public List<CommentDto> getComments(UUID articleId,String orderBy,String direction,
-                                        String cursor, Instant after, int limit) {
+    public CursorPageResponse<CommentDto> getComments(
+        UUID articleId,
+        String orderBy,
+        String direction,
+        String cursor,
+        Instant after,
+        int limit,
+        UUID userId
+    ) {
+        log.info("댓글 조회 요청: articleId={}, orderBy={}, direction={}, cursor={}, limit={}, userId={}",
+            articleId, orderBy, direction, cursor, limit, userId);
 
-        log.info("댓글 조회 요청: articleId={}", articleId);
+        List<Comment> comments = commentRepository.findByArticleIdWithCursor(
+            articleId, orderBy, direction, cursor, after, limit
+        );
 
-        // 1단계: 삭제되지 않은 댓글만 조회 (나중에 정렬/페이징 추가 예정)
-        List<Comment> comments = commentRepository.findByArticle_IdAndDeletedAtIsNull(articleId);
+        log.info("조회된 댓글 수: {} (limit: {})", comments.size(), limit);
 
-        log.info("조회된 댓글 수: {}", comments.size());
+        boolean hasNext = comments.size() > limit;
+        List<Comment> actualComments = hasNext ? comments.subList(0, limit) : comments;
 
-        // 2단계: Entity → DTO 변환
-        return comments.stream()
-                .map(this::convertToDto)
-                .collect(Collectors.toList());
+        List<UUID> commentIds = actualComments.stream()
+            .map(Comment::getId)
+            .collect(Collectors.toList());
+
+        Set<UUID> likedCommentIds = getLikedCommentIds(commentIds, userId);
+        Map<UUID, Long> likeCountMap = getLikeCountMap(commentIds);
+
+        List<CommentDto> commentDtos = actualComments.stream()
+            .map(comment -> convertToDtoWithLikes(comment, likedCommentIds, likeCountMap))
+            .collect(Collectors.toList());
+
+        String nextCursor = null;
+        Instant nextAfter = null;
+        if (hasNext && !actualComments.isEmpty()) {
+            Comment lastComment = actualComments.get(actualComments.size() - 1);
+            nextCursor = lastComment.getId().toString();
+            nextAfter = lastComment.getCreatedAt();
+        }
+
+        long totalElements = commentRepository.countByArticleId(articleId);
+
+        return CursorPageResponse.<CommentDto>builder()
+            .content(commentDtos)
+            .nextCursor(nextCursor)
+            .nextAfter(nextAfter)
+            .size(commentDtos.size())
+            .totalElements(totalElements)
+            .hasNext(hasNext)
+            .build();
+    }
+
+    private Set<UUID> getLikedCommentIds(List<UUID> commentIds, UUID userId) {
+        if (commentIds.isEmpty() || userId == null) {
+            return Set.of();
+        }
+
+        return commentLikeRepository.findByCommentIdsAndUserId(commentIds, userId)
+            .stream()
+            .map(commentLike -> commentLike.getComment().getId())
+            .collect(Collectors.toSet());
+    }
+
+    private Map<UUID, Long> getLikeCountMap(List<UUID> commentIds) {
+        if (commentIds.isEmpty()) {
+            return Map.of();
+        }
+
+        List<Object[]> results = commentLikeRepository.countByCommentIds(commentIds);
+
+        Map<UUID, Long> likeCountMap = new HashMap<>();
+        for (Object[] result : results) {
+            UUID commentId = (UUID) result[0];
+            Long count = (Long) result[1];
+            likeCountMap.put(commentId, count);
+        }
+
+        return likeCountMap;
+    }
+
+    private CommentDto convertToDtoWithLikes(
+        Comment comment,
+        Set<UUID> likedCommentIds,
+        Map<UUID, Long> likeCountMap
+    ) {
+        return CommentDto.builder()
+            .id(comment.getId())
+            .articleId(comment.getArticle() != null ? comment.getArticle().getId() : null)
+            .userId(comment.getUser() != null ? comment.getUser().getId() : null)
+            .userNickname(comment.getUser() != null ? comment.getUser().getNickname() : "탈퇴한 사용자")
+            .content(comment.getContent())
+            .likeCount(likeCountMap.getOrDefault(comment.getId(), 0L))
+            .likedByMe(likedCommentIds.contains(comment.getId()))
+            .createdAt(comment.getCreatedAt())
+            .build();
     }
 
 

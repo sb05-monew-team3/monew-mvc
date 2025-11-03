@@ -105,4 +105,27 @@ public class SubscriptionMapperTest {
         assertThat(dto.interestKeywords()).isNull();
         assertThat(dto.interestSubscriberCount()).isEqualTo(10L);
     }
+
+    @Test
+    @DisplayName("toDto: keywords와 subscriberCount가 null일 때, DTO가 정상 생성되어야 한다")
+    void toDto_shouldHandleNullKeywordsAndSubscriberCount() {
+        // given: (non-null, null, null) 조합 테스트
+        Interest interest = Interest.builder().id(UUID.randomUUID()).name("JPA").build();
+        Subscription subscription = Subscription.builder()
+            .id(UUID.randomUUID())
+            .interest(interest)
+            .build();
+
+        // when
+        SubscriptionDto dto = subscriptionMapper.toDto(subscription, null, null);
+
+        // then
+        assertThat(dto).isNotNull();
+        // subscription 필드는 non-null
+        assertThat(dto.id()).isEqualTo(subscription.getId());
+        assertThat(dto.interestName()).isEqualTo("JPA");
+        // null로 전달된 두 필드는 null
+        assertThat(dto.interestKeywords()).isNull();
+        assertThat(dto.interestSubscriberCount()).isNull();
+    }
 }

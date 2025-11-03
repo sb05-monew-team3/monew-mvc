@@ -7,12 +7,16 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.monew.monew_server.domain.comment.entity.Comment;
 import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
 import com.monew.monew_server.domain.notification.dto.NotificationDto;
 import com.monew.monew_server.domain.notification.entity.Notification;
-import com.monew.monew_server.domain.notification.exception.NotificationNotFoundException;
+import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
 import com.monew.monew_server.domain.notification.mapper.NotificationMapper;
 import com.monew.monew_server.domain.notification.repository.NotificationRepository;
+import com.monew.monew_server.domain.user.entity.User;
+import com.monew.monew_server.domain.user.repository.UserRepository;
+import com.monew.monew_server.exception.NotificationNotFoundException;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,7 +28,32 @@ public class NotificationService {
 
 	private final NotificationRepository notificationRepository;
 	private final NotificationMapper notificationMapper;
-	
+	private final UserRepository userRepository;
+
+	@Transactional
+	public void createCommentLikeNotification(Comment comment, UUID likedByUserId) {
+		log.debug("알림(댓글 좋아요) 생성 시작: commentId={}, likedBy={}", comment.getId(), likedByUserId);
+
+		if (comment.getUser().getId().equals(likedByUserId)) {
+			log.debug("자기 댓글 좋아요: commentId={}, userId={}", comment.getId(), likedByUserId);
+			return;
+		}
+
+		User likedByUser = userRepository.getReferenceById(likedByUserId);
+
+		Notification notification = Notification.builder()
+			.user(comment.getUser())
+			.content(String.format("%s님이 나의 댓글을 좋아합니다.", likedByUser.getNickname()))
+			.resourceType(NotificationResourceType.COMMENT)
+			.resourceId(comment.getId())
+			.confirmed(false)
+			.build();
+
+		notificationRepository.save(notification);
+
+		log.info("알림(댓글 좋아요) 생성 완료: commentId={}, likedBy={}", comment.getId(), likedByUserId);
+	}
+
 	@Transactional(readOnly = true)
 	public CursorPageResponse<NotificationDto> findAllNotConfirmed(
 		UUID userId,

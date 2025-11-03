@@ -1,15 +1,23 @@
 package com.monew.monew_server.domain.article.service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
+import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
+import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
 import com.monew.monew_server.domain.article.dto.ArticleSourceDto;
 import com.monew.monew_server.domain.article.dto.CursorPageResponseArticleDto;
 import com.monew.monew_server.domain.article.entity.Article;
@@ -20,6 +28,7 @@ import com.monew.monew_server.domain.article.mapper.ArticleMapper;
 import com.monew.monew_server.domain.article.repository.ArticleRepository;
 import com.monew.monew_server.domain.article.repository.ArticleRepositoryCustom;
 import com.monew.monew_server.domain.article.repository.ArticleViewRepository;
+import com.monew.monew_server.domain.article.storage.S3BinaryStorage;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.exception.ArticleNotFoundException;
@@ -29,28 +38,34 @@ import com.monew.monew_server.exception.ErrorCode;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
+import lombok.extern.slf4j.Slf4j;
 
+@Slf4j
 @Service
 public class ArticleService {
 
-	private final ArticleRepository articleRepository; // JpaRepository
-	private final ArticleRepositoryCustom articleRepositoryCustom; // @Qualifier 필요
+	private final ArticleRepository articleRepository;
+	private final ArticleRepositoryCustom articleRepositoryCustom;
 	private final ArticleMapper articleMapper;
 	private final ArticleViewRepository articleViewRepository;
 	private final CommentRepository commentRepository;
+	private final S3BinaryStorage s3BinaryStorage;
+	private final ObjectMapper objectMapper;
 
 	public ArticleService(
 		ArticleRepository articleRepository,
 		@Qualifier("articleRepositoryImpl") ArticleRepositoryCustom articleRepositoryCustom,
 		ArticleMapper articleMapper,
 		ArticleViewRepository articleViewRepository,
-		CommentRepository commentRepository
+		CommentRepository commentRepository, S3BinaryStorage s3BinaryStorage
 	) {
 		this.articleRepository = articleRepository;
 		this.articleRepositoryCustom = articleRepositoryCustom;
 		this.articleMapper = articleMapper;
 		this.articleViewRepository = articleViewRepository;
 		this.commentRepository = commentRepository;
+		this.s3BinaryStorage = s3BinaryStorage;
+		this.objectMapper = new ObjectMapper();
 	}
 
 	private static final int DEFAULT_PAGE_SIZE = 10;
@@ -59,18 +74,14 @@ public class ArticleService {
 
 	public CursorPageResponseArticleDto fetchArticles(ArticleRequest request, UUID currentUserId) {
 
-		// if (request.keyword() != null && request.keyword().isBlank()) {
-		// 	throw new IllegalArgumentException("검색 키워드는 비어 있을 수 없습니다.");
-		// }
-
-		int requestedSize = request.size() != null ? request.size() : DEFAULT_PAGE_SIZE; // N
+		int requestedSize = request.limit() != null ? request.limit() : DEFAULT_PAGE_SIZE;
 		int fetchSize = requestedSize + 1;
+
 		List<Article> fetchedArticles = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, fetchSize);
 		long totalElements = articleRepositoryCustom.countArticlesWithFilter(request);
 		boolean hasNext = fetchedArticles.size() > requestedSize;
 
 		List<ArticleResponse> allResponses = articleMapper.toResponseList(fetchedArticles);
-
 		List<UUID> articleIds = fetchedArticles.stream().map(Article::getId).toList();
 
 		var viewCounts = articleViewRepository.findViewCountsByArticleIds(articleIds)
@@ -94,40 +105,43 @@ public class ArticleService {
 			)
 		).toList();
 
+		ArticleSortType sortBy;
+		try {
+			sortBy = ArticleSortType.valueOf(
+				Optional.ofNullable(request.orderBy()).orElse("DATE").toUpperCase()
+			);
+		} catch (IllegalArgumentException e) {
+			sortBy = ArticleSortType.DATE;
+		}
+
 		String nextCursor = null;
 		String nextAfterString = null;
-		ArticleSortType sortBy = request.sortBy() == null ? ArticleSortType.DATE : request.sortBy();
-
 		List<ArticleResponse> finalContentList = enrichedResponses;
 
 		if (hasNext) {
-			ArticleResponse nextCursorArticle = enrichedResponses.get(requestedSize);
+			// 마지막 항목 (실제로는 limit+1 번째 항목)
+			ArticleResponse lastArticle = enrichedResponses.get(requestedSize);
 
-			nextCursor = nextCursorArticle.id().toString();
-
+			// nextCursor는 정렬 기준 값으로 설정 (Interest 방식)
 			switch (sortBy) {
-				case DATE -> nextAfterString = nextCursorArticle.publishDate().toString();
-				case COMMENT_COUNT -> nextAfterString = String.valueOf(
-					nextCursorArticle.commentCount() != null ? nextCursorArticle.commentCount() : 0
+				case DATE -> nextCursor = lastArticle.publishDate().toString();
+				case COMMENT_COUNT -> nextCursor = String.valueOf(
+					lastArticle.commentCount() != null ? lastArticle.commentCount() : 0
 				);
-				case VIEW_COUNT -> nextAfterString = String.valueOf(
-					nextCursorArticle.viewCount() != null ? nextCursorArticle.viewCount() : 0
+				case VIEW_COUNT -> nextCursor = String.valueOf(
+					lastArticle.viewCount() != null ? lastArticle.viewCount() : 0
 				);
 			}
 
+			// nextAfter는 tie-breaker용 (publishDate)
+			nextAfterString = lastArticle.publishDate().toString();
+
+			// 실제 반환할 데이터는 limit 개수만큼만
 			finalContentList = enrichedResponses.subList(0, requestedSize);
-		} else if (!enrichedResponses.isEmpty() && (sortBy == ArticleSortType.VIEW_COUNT
-			|| sortBy == ArticleSortType.COMMENT_COUNT)) {
-			ArticleResponse lastArticle = enrichedResponses.get(enrichedResponses.size() - 1);
-
-			if (sortBy == ArticleSortType.VIEW_COUNT) {
-				nextAfterString = String.valueOf(lastArticle.viewCount() != null ? lastArticle.viewCount() : 0);
-			} else {
-				nextAfterString = String.valueOf(lastArticle.commentCount() != null ? lastArticle.commentCount() : 0);
-			}
 		}
 
-		if (finalContentList.isEmpty() && request.keyword() != null && !request.keyword().isBlank()
+		if (finalContentList.isEmpty()
+			&& request.keyword() != null && !request.keyword().isBlank()
 			&& (request.cursor() == null || request.cursor().isBlank())) {
 			throw new ArticleNotFoundException("검색 결과가 없습니다.");
 		}
@@ -194,4 +208,75 @@ public class ArticleService {
 
 		articleRepository.delete(article);
 	}
+
+	@Transactional
+	public List<ArticleRestoreResult> restoreArticles(LocalDateTime from, LocalDateTime to) {
+		List<ArticleRestoreResult> results = new ArrayList<>();
+		LocalDateTime current = from;
+
+		while (!current.isAfter(to)) {
+			try {
+				List<ArticleSaveDto> backupArticles = s3BinaryStorage.getBackupArticles(current);
+
+				if (backupArticles.isEmpty()) {
+					log.warn("{} 날짜 백업 파일이 없습니다.",
+						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+					current = current.plusDays(1);
+					continue;
+				}
+
+				log.info("{} 날짜 백업 파일 {}건 로드 완료",
+					current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+					backupArticles.size());
+
+				List<ArticleSource> backupSources = backupArticles.stream()
+					.map(ArticleSaveDto::getSource)
+					.distinct()
+					.toList();
+
+				List<String> backupSourceUrls = backupArticles.stream()
+					.map(ArticleSaveDto::getSourceUrl)
+					.toList();
+
+				List<Article> existingArticles = articleRepository
+					.findBySourceInAndSourceUrlIn(backupSources, backupSourceUrls);
+
+				Set<String> existingLinks = existingArticles.stream()
+					.map(Article::getOriginalLink)
+					.collect(Collectors.toSet());
+
+				List<Article> newArticles = backupArticles.stream()
+					.filter(dto -> !existingLinks.contains(dto.getOriginalLink()))
+					.map(Article::fromDto)
+					.collect(Collectors.toList());
+
+				if (!newArticles.isEmpty()) {
+					articleRepository.saveAll(newArticles);
+
+					results.add(new ArticleRestoreResult(
+						LocalDateTime.now(),
+						newArticles.stream().map(Article::getId).toList(),
+						newArticles.size()
+					));
+
+					log.info("{} 날짜 복구 완료 (총 {}건 중 {}건 신규 저장)",
+						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
+						backupArticles.size(),
+						newArticles.size());
+				} else {
+					log.info("{} 날짜 모든 기사가 이미 존재합니다.",
+						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
+				}
+
+			} catch (Exception e) {
+				log.error("{} 날짜 복구 중 오류 발생",
+					current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), e);
+			}
+
+			current = current.plusDays(1);
+		}
+
+		return results;
+	}
+
 }

@@ -23,8 +23,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 	@Query("""
 		SELECT u
 		FROM User u
-		WHERE u.id = :userId
+		WHERE u.id = :userId AND u.deletedAt IS NULL
 		""")
 	Optional<User> findUserInfoById(@Param("userId") UUID userId);
-
 }

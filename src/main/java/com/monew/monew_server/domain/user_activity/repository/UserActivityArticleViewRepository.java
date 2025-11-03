@@ -14,4 +14,6 @@ public interface UserActivityArticleViewRepository extends JpaRepository<Article
 	// 특정 사용자가 본 뉴스 기사
 	@EntityGraph(attributePaths = {"article"})
 	List<ArticleView> findTop10ByUser_IdOrderByCreatedAtDesc(UUID userId);
+
+	long countByArticle_id(UUID articleId);
 }

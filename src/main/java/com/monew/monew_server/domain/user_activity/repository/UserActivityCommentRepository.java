@@ -14,4 +14,6 @@ public interface UserActivityCommentRepository extends JpaRepository<Comment, UU
 	// 특정 사용자가 작성한 최근 댓글 10개 조회
 	@EntityGraph(attributePaths = {"user", "article"})
 	List<Comment> findTop10ByUser_IdOrderByCreatedAtDesc(UUID userId);
+
+	long countByArticle_Id(UUID articleId);
 }

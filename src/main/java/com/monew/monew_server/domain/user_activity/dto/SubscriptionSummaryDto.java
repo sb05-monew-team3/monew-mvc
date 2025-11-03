@@ -9,11 +9,11 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class SubscriptionsSummaryDto {
+public class SubscriptionSummaryDto {
 	private UUID id;
 	private UUID interestId;
 	private String interestName;
 	private List<String> interestKeywords;
-	private long interestSubscribedCount;
+	private long interestSubscriberCount;
 	private OffsetDateTime createdAt;
 }

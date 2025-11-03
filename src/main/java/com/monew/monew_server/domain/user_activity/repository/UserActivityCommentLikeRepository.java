@@ -14,4 +14,6 @@ public interface UserActivityCommentLikeRepository extends JpaRepository<Comment
 	// 특정 사용자가 좋아요한 댓글 10
 	@EntityGraph(attributePaths = {"comment"})
 	List<CommentLike> findTop10ByUser_IdOrderByCreatedAtDesc(UUID userId);
+
+	long countByComment_Id(UUID commentId);
 }

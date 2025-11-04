@@ -19,7 +19,6 @@ import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
 import com.monew.monew_server.exception.ErrorCode;
 import com.monew.monew_server.exception.InterestException;
-import com.monew.monew_server.exception.NotFoundException;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.Optional;
@@ -192,17 +191,34 @@ class InterestServiceTest {
     }
 
     @Test
+    @DisplayName("subscribe - 실패 (유저가 존재하지 않음)")
+    void subscribe_shouldThrowException_whenUserNotFound() {
+        // given
+        UUID fakeUserId = UUID.randomUUID();
+
+        // when & then
+        InterestException exception = assertThrows(InterestException.class,
+            () -> interestService.subscribe(interest1.getId(), fakeUserId)
+        );
+
+        assertThat(exception.getMessage()).contains("사용자를 찾을 수 없습니다.");
+
+        // DB 검증
+        assertThat(subscriptionRepository.count()).isZero();
+    }
+
+    @Test
     @DisplayName("subscribe - 실패 (관심사가 존재하지 않음)")
     void subscribe_shouldThrowException_whenInterestNotFound() {
         // given
         UUID fakeInterestId = UUID.randomUUID();
 
         // when & then
-        NotFoundException exception = assertThrows(NotFoundException.class,
+        InterestException exception = assertThrows(InterestException.class,
             () -> interestService.subscribe(fakeInterestId, user1.getId())
         );
 
-        assertThat(exception.getMessage()).contains("Interest not found");
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
 
         // DB 검증
         assertThat(subscriptionRepository.count()).isZero();
@@ -247,6 +263,23 @@ class InterestServiceTest {
         assertThat(resultDto.name()).isEqualTo("Java");
         assertThat(resultDto.subscriberCount()).isEqualTo(2L);
         assertThat(resultDto.subscribedByMe()).isTrue(); // user1로 조회
+    }
+
+    @Test
+    @DisplayName("unsubscribe - 실패 (유저가 존재하지 않음)")
+    void unsubscribe_shouldThrowException_whenUserNotFound() {
+        // given
+        UUID fakeUserId = UUID.randomUUID();
+
+        // when & then
+        InterestException exception = assertThrows(InterestException.class,
+            () -> interestService.unsubscribe(interest1.getId(), fakeUserId)
+        );
+
+        assertThat(exception.getMessage()).contains("사용자를 찾을 수 없습니다.");
+
+        // DB 검증
+        assertThat(subscriptionRepository.count()).isZero();
     }
 
     @Test
@@ -307,11 +340,11 @@ class InterestServiceTest {
         // when & then:
         // 2. getOrThrow(interestId)에서 예외가 발생하는지 검증
         // (ErrorCode.INTEREST_NOT_FOUND는 이전 'getOrThrow' 테스트에서 가정한 값 사용)
-        NotFoundException exception = assertThrows(NotFoundException.class, () -> interestService.unsubscribe(fakeInterestId, user1.getId()));
+        InterestException exception = assertThrows(InterestException.class, () -> interestService.unsubscribe(fakeInterestId, user1.getId()));
 
         // 3. 예외 상세 내용 검증
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);
-        assertThat(exception.getMessage()).contains("Interest not found with id: " + fakeInterestId);
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
     }
 
     @Test
@@ -343,7 +376,7 @@ class InterestServiceTest {
     }
 
     @Test
-    @DisplayName("delete - 실패 (404 Not Found): ID가 존재하지 않을 때 NotFoundException 발생")
+    @DisplayName("delete - 실패 (404 Not Found): ID가 존재하지 않을 때 InterestException 발생")
     void delete_shouldThrowNotFound_whenInterestDoesNotExist() {
         // given
         // 1. 존재하지 않는 ID
@@ -351,11 +384,11 @@ class InterestServiceTest {
 
         // when & then
         // 2. getOrThrow(interestId)에서 예외가 발생하는지 검증
-        NotFoundException exception = assertThrows(NotFoundException.class, () -> interestService.delete(fakeInterestId));
+        InterestException exception = assertThrows(InterestException.class, () -> interestService.delete(fakeInterestId));
 
         // 3. 예외 상세 내용 검증 (ErrorCode.INTEREST_NOT_FOUND는 getOrThrow에 정의됨)
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);
-        assertThat(exception.getMessage()).contains("Interest not found with id: " + fakeInterestId);
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
     }
 
     @Test
@@ -398,10 +431,10 @@ class InterestServiceTest {
         InterestUpdateRequest request = new InterestUpdateRequest(List.of("k1"));
 
         // when & then (getOrThrow 검증)
-        NotFoundException exception = assertThrows(NotFoundException.class, () -> interestService.update(fakeInterestId, request));
+        InterestException exception = assertThrows(InterestException.class, () -> interestService.update(fakeInterestId, request));
 
         // 3. 예외 상세 내용 검증
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);
-        assertThat(exception.getMessage()).contains("Interest not found with id: " + fakeInterestId);
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
     }
 }

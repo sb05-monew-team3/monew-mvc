@@ -3,7 +3,6 @@ package com.monew.monew_server.domain.interest.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.article.entity.Article;
 import com.monew.monew_server.domain.common.BaseEntity;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -34,11 +33,11 @@ import lombok.experimental.SuperBuilder;
 public class ArticleInterest extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "article_id", nullable = false)
+	@JoinColumn(name = "article_id")
 	private Article article;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "interest_id", nullable = false)
+	@JoinColumn(name = "interest_id")
 	private Interest interest;
 
 	public static ArticleInterest of(Article article, Interest interest) {

@@ -39,7 +39,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class CommentLikeServiceTest {
 
     @Container
-    @SuppressWarnings("resource")
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:15-alpine");
 
     @DynamicPropertySource
@@ -272,7 +271,7 @@ class CommentLikeServiceTest {
         entityManager.clear();
 
         // when: user1이 좋아요
-        CommentLikeDto result = commentLikeService.addLike(comment.getId(), user1.getId());
+        commentLikeService.addLike(comment.getId(), user1.getId());
         entityManager.flush();
 
         // then: user2에게 알림이 생성됨
@@ -287,7 +286,7 @@ class CommentLikeServiceTest {
         assertThat(notifications.get(0).getContent())
             .isEqualTo("테스터1님이 나의 댓글을 좋아합니다.");
         assertThat(notifications.get(0).getResourceType())
-            .isEqualTo(NotificationResourceType.COMMENT);
+            .isEqualTo(NotificationResourceType.comment);
         assertThat(notifications.get(0).getResourceId())
             .isEqualTo(comment.getId());
     }
@@ -299,7 +298,7 @@ class CommentLikeServiceTest {
         entityManager.clear();
 
         // when: user1이 본인 댓글에 좋아요
-        CommentLikeDto result = commentLikeService.addLike(comment1.getId(), user1.getId());
+        commentLikeService.addLike(comment1.getId(), user1.getId());
         entityManager.flush();
 
         // then: 알림 생성 안 됨

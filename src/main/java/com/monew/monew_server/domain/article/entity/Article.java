@@ -1,23 +1,16 @@
 package com.monew.monew_server.domain.article.entity;
 
-import java.time.Instant;
-import java.util.List;
-
-import org.hibernate.annotations.JdbcType;
-import org.hibernate.dialect.PostgreSQLEnumJdbcType;
-
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
-
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -27,11 +20,7 @@ import lombok.ToString;
 import lombok.experimental.SuperBuilder;
 
 @Entity
-@Table(name = "articles",
-	uniqueConstraints = @UniqueConstraint(
-		name = "uk_articles_source_source_url",
-		columnNames = {"source", "sourceUrl"}
-	))
+@Table(name = "articles")
 @Getter
 @Setter
 @SuperBuilder
@@ -40,21 +29,16 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Article extends BaseDeletableEntity {
+
 	@Enumerated(EnumType.STRING)
-	@Column(name = "source", nullable = false)
-	@JdbcType(PostgreSQLEnumJdbcType.class)
 	private ArticleSource source;
 
-	@Column(columnDefinition = "text", nullable = false)
 	private String sourceUrl;
 
-	@Column(columnDefinition = "text", nullable = false)
 	private String title;
 
-	@Column(columnDefinition = "text", nullable = false)
 	private String summary;
 
-	@Column(nullable = false)
 	private Instant publishDate;
 
 	@OneToMany(mappedBy = "article")

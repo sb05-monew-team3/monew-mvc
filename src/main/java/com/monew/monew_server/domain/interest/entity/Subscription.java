@@ -3,7 +3,6 @@ package com.monew.monew_server.domain.interest.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.common.BaseEntity;
 import com.monew.monew_server.domain.user.entity.User;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -34,10 +33,10 @@ import lombok.experimental.SuperBuilder;
 public class Subscription extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id", nullable = false)
+	@JoinColumn(name = "user_id")
 	private User user;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "interest_id", nullable = false)
+	@JoinColumn(name = "interest_id")
 	private Interest interest;
 }

@@ -5,10 +5,14 @@ import static org.mockito.BDDMockito.*;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
+import com.monew.monew_server.domain.notification.dto.NotificationDto;
+import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
+import com.monew.monew_server.domain.notification.service.NotificationService;
+import com.monew.monew_server.exception.NotificationNotFoundException;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -22,13 +26,6 @@ import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
-import com.monew.monew_server.domain.notification.dto.NotificationDto;
-import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
-import com.monew.monew_server.domain.notification.service.NotificationService;
-import com.monew.monew_server.exception.NotificationNotFoundException;
 
 @WebMvcTest(controllers = NotificationController.class,
 	excludeAutoConfiguration = {
@@ -49,9 +46,6 @@ class NotificationControllerTest {
 	@Autowired
 	private MockMvc mockMvc;
 
-	@Autowired
-	private ObjectMapper objectMapper;
-
 	@MockitoBean
 	private NotificationService notificationService;
 
@@ -69,7 +63,7 @@ class NotificationControllerTest {
 			false,
 			userId,
 			"Test notification",
-			NotificationResourceType.INTEREST,
+			NotificationResourceType.interest,
 			UUID.randomUUID(),
 			Instant.now(),
 			Instant.now()

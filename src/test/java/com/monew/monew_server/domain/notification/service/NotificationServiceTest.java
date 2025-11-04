@@ -48,9 +48,8 @@ class NotificationServiceTest {
 	private User user;
 	private UUID notificationId;
 	private Notification notification;
-	private NotificationDto notificationDto;
 
-	@BeforeEach
+    @BeforeEach
 	void setUp() {
 		userId = UUID.randomUUID();
 		notificationId = UUID.randomUUID();
@@ -64,20 +63,20 @@ class NotificationServiceTest {
 			.confirmed(false)
 			.user(user)
 			.content("Test notification")
-			.resourceType(NotificationResourceType.INTEREST)
+			.resourceType(NotificationResourceType.interest)
 			.resourceId(UUID.randomUUID())
 			.build();
 
-		notificationDto = new NotificationDto(
-			notificationId,
-			false,
-			userId,
-			"Test notification",
-			NotificationResourceType.INTEREST,
-			UUID.randomUUID(),
-			Instant.now(),
-			Instant.now()
-		);
+        new NotificationDto(
+            notificationId,
+            false,
+            userId,
+            "Test notification",
+            NotificationResourceType.interest,
+            UUID.randomUUID(),
+            Instant.now(),
+            Instant.now()
+        );
 	}
 
 	@Test
@@ -118,7 +117,7 @@ class NotificationServiceTest {
 		verify(userRepository).getReferenceById(likedByUser.getId());
 		verify(notificationRepository).save(argThat(notification ->
 			notification.getUser().getId().equals(userId) &&
-				notification.getResourceType() == NotificationResourceType.COMMENT &&
+				notification.getResourceType() == NotificationResourceType.comment &&
 				notification.getResourceId().equals(comment.getId()) &&
 				!notification.isConfirmed() &&
 				notification.getContent().contains(likedByUser.getNickname())

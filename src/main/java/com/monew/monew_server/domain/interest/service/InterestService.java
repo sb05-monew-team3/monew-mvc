@@ -121,6 +121,10 @@ public class InterestService {
     @Transactional
     public SubscriptionDto subscribe(UUID interestId, UUID userId) {
 
+        userRepository.findById(userId).orElseThrow(() ->
+            new InterestException(ErrorCode.USER_NOT_FOUND)
+        );
+
         Interest interest = interestRepository.getOrThrow(interestId);
 
         Optional<Subscription> existingSubscription = subscriptionRepository
@@ -148,6 +152,10 @@ public class InterestService {
 
     @Transactional
     public void unsubscribe(UUID interestId, UUID userId) {
+
+        userRepository.findById(userId).orElseThrow(() ->
+            new InterestException(ErrorCode.USER_NOT_FOUND)
+        );
 
         interestRepository.getOrThrow(interestId);
         subscriptionRepository.deleteByUserIdAndInterestId(userId, interestId);

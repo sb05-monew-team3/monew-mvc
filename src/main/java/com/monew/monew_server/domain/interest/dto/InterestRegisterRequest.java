@@ -10,6 +10,6 @@ public record InterestRegisterRequest(
     String name,
 
     @NotNull
-    @Size(min = 1, max = 10)
+    @Size(min = 1, max = 10, message = "관련 키워드는 1개 이상 10개 이하로 작성해주세요")
     List<String> keywords
 ) {}

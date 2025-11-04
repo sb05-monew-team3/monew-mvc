@@ -1,45 +1,40 @@
 package com.monew.monew_server.domain.comment.controller;
 
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.BDDMockito.given;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
 import com.monew.monew_server.domain.comment.dto.CommentDto;
 import com.monew.monew_server.domain.comment.dto.CommentLikeDto;
 import com.monew.monew_server.domain.comment.dto.CursorPageResponse;
 import com.monew.monew_server.domain.comment.service.CommentLikeService;
 import com.monew.monew_server.domain.comment.service.CommentService;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
-import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
-import org.springframework.test.web.servlet.MockMvc;
-import org.springframework.http.MediaType;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.BDDMockito.given;
-import static org.mockito.BDDMockito.willReturn;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
-
-
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
 @WebMvcTest(CommentController.class)
 class CommentControllerTest {
 
     @Autowired
     private MockMvc mockMvc;
-    @MockBean
+
+    @MockitoBean
     private CommentService commentService;
-    @MockBean
+
+    @MockitoBean
     private CommentLikeService commentLikeService;
 
 
@@ -135,17 +130,14 @@ class CommentControllerTest {
 
     /**
      * GET /api/comments 테스트
-     *
      * <WebMvcTest란?>
      * - Controller 레이어만 테스트하는 슬라이스 테스트
      * - Service는 @MockBean으로 가짜 객체 사용
      * - 실제 DB 연결 없이 컨트롤러 로직만 검증
-     *
      * <given-when-then 패턴>
      * - Given: 테스트 데이터와 Mock 설정
      * - When: 실제 HTTP 요청 실행
      * - Then: 응답 검증
-     *
      * <jsonPath란?>
      * - JSON 응답의 특정 필드 값을 검증하는 도구
      * - $.content[0].content: content 배열의 첫 번째 요소의 content 필드

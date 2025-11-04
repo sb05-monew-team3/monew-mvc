@@ -2,11 +2,15 @@ package com.monew.monew_server.domain.notification.repository;
 
 import static org.assertj.core.api.Assertions.*;
 
+import com.monew.monew_server.config.JpaConfig;
+import com.monew.monew_server.config.QuerydslConfig;
+import com.monew.monew_server.domain.notification.entity.Notification;
+import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
+import com.monew.monew_server.domain.user.entity.User;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -15,13 +19,6 @@ import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabas
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-
-import com.monew.monew_server.config.JpaConfig;
-import com.monew.monew_server.config.QuerydslConfig;
-import com.monew.monew_server.domain.notification.entity.Notification;
-import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
-import com.monew.monew_server.domain.user.entity.User;
 
 @DataJpaTest
 @Import({QuerydslConfig.class, JpaConfig.class})
@@ -53,7 +50,7 @@ class NotificationRepositoryTest {
 		notification1 = Notification.builder()
 			.user(testUser)
 			.content("Test notification 1")
-			.resourceType(NotificationResourceType.INTEREST)
+			.resourceType(NotificationResourceType.interest)
 			.resourceId(UUID.randomUUID())
 			.confirmed(false)
 			.build();
@@ -61,7 +58,7 @@ class NotificationRepositoryTest {
 		notification2 = Notification.builder()
 			.user(testUser)
 			.content("Test notification 2")
-			.resourceType(NotificationResourceType.COMMENT)
+			.resourceType(NotificationResourceType.comment)
 			.resourceId(UUID.randomUUID())
 			.confirmed(false)
 			.build();
@@ -69,7 +66,7 @@ class NotificationRepositoryTest {
 		notification3 = Notification.builder()
 			.user(testUser)
 			.content("Test notification 3")
-			.resourceType(NotificationResourceType.INTEREST)
+			.resourceType(NotificationResourceType.interest)
 			.resourceId(UUID.randomUUID())
 			.confirmed(true)
 			.build();

@@ -1,0 +1,54 @@
+spring:
+  config:
+    activate:
+      on-profile: prod
+  aws:
+    apache-http:
+      connection-acquisition-timeout: 10000
+      max-connections: 100
+      socket-timeout: 10000
+    accessKeyId: ${AWS_S3_ACCESS_KEY}
+    secretKey: ${AWS_S3_SECRET_KEY}
+    region: ${AWS_S3_REGION}
+    s3:
+      bucket: ${AWS_S3_BUCKET}
+  boot:
+    admin:
+      client:
+        enabled: true
+        url: ${SPRING_BOOT_ADMIN_URL:http://localhost:9090}
+        instance:
+          name: monew_server
+          service-url: ${SERVER_PUBLIC_URL:http://localhost:8080}
+          management-base-url: ${MANAGEMENT_PUBLIC_URL:http://localhost:8081}
+  datasource:
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://${DB_PROD_HOST}/${DB_PROD_NAME}
+    username: ${DB_LOCAL_USER}
+    password: ${DB_LOCAL_PASSWORD}
+
+  data:
+    mongodb:
+      uri: mongodb+srv://${DB_MONGO_USERNAME}:${DB_MONGO_PASSWORD}@monewcluster.1hw0geh.mongodb.net/${DB_MONGO_DB}?retryWrites=true&w=majority&appName=monewCluster
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: true
+    properties:
+      hibernate:
+        physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
+        jdbc.time_zone: UTC
+      open-in-view: false
+
+logging:
+  level:
+    root: info
+
+    org.hibernate: warn
+    com.zaxxer.hikari: warn
+    org.mongodb.driver: warn
+    org.springframework.web: warn
+    org.springframework.filter.CommonsRequestLoggingFilter: warn
+
+    com.monew.monew_server: info

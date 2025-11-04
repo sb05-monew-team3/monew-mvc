@@ -2,8 +2,6 @@ package com.monew.monew_server.domain.user.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
-
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -25,12 +23,9 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseDeletableEntity {
 
-	@Column(nullable = false, unique = true)
 	private String email;
 
-	@Column(nullable = false, length = 30)
 	private String nickname;
 
-	@Column(nullable = false, length = 60)
 	private String password;
 }

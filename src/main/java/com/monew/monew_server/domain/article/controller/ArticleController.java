@@ -8,7 +8,6 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -19,11 +18,9 @@ import org.springframework.web.bind.annotation.RestController;
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
 import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
-import com.monew.monew_server.domain.article.dto.ArticleSourceDto;
 import com.monew.monew_server.domain.article.dto.CursorPageResponseArticleDto;
 import com.monew.monew_server.domain.article.service.ArticleService;
 
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
@@ -51,11 +48,32 @@ public class ArticleController {
 
 	@GetMapping
 	public ResponseEntity<CursorPageResponseArticleDto> getArticles(
-		@Valid @ModelAttribute ArticleRequest request,
+		@RequestParam(required = false) String keyword,
+		@RequestParam(required = false) UUID interestId,
+		@RequestParam(required = false) List<String> sourceIn,
+		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime publishDateFrom,
+		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime publishDateTo,
+		@RequestParam(required = false) String orderBy,
+		@RequestParam(required = false) String direction,
+		@RequestParam(required = false) String cursor,
+		@RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE_TIME) LocalDateTime after,
+		@RequestParam(required = false) Integer limit,
 		@RequestHeader(value = USER_ID_HEADER, required = false) String userIdHeader
 	) {
 		UUID userId = getUserIdFromHeader(userIdHeader);
-		log.info("GET /api/articles - (사용자 ID: {})", userId);
+
+		ArticleRequest request = new ArticleRequest(
+			keyword,
+			interestId,
+			sourceIn,
+			publishDateFrom,
+			publishDateTo,
+			orderBy,
+			direction,
+			cursor,
+			after,
+			limit
+		);
 
 		CursorPageResponseArticleDto articles = articleService.fetchArticles(request, userId);
 		return ResponseEntity.ok(articles);
@@ -74,7 +92,7 @@ public class ArticleController {
 	}
 
 	@GetMapping("/sources")
-	public ResponseEntity<List<ArticleSourceDto>> getSources() {
+	public ResponseEntity<List<String>> getSources() {
 		log.info("GET /api/articles/sources");
 		return ResponseEntity.ok(articleService.getAllSources());
 	}

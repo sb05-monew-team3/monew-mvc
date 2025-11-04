@@ -5,7 +5,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -18,22 +18,25 @@ import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
 import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
 import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
-import com.monew.monew_server.domain.article.dto.ArticleSourceDto;
 import com.monew.monew_server.domain.article.dto.CursorPageResponseArticleDto;
 import com.monew.monew_server.domain.article.entity.Article;
 import com.monew.monew_server.domain.article.entity.ArticleSortType;
 import com.monew.monew_server.domain.article.entity.ArticleSource;
 import com.monew.monew_server.domain.article.entity.ArticleView;
 import com.monew.monew_server.domain.article.mapper.ArticleMapper;
+import com.monew.monew_server.domain.article.repository.ArticleInterestRepository;
 import com.monew.monew_server.domain.article.repository.ArticleRepository;
 import com.monew.monew_server.domain.article.repository.ArticleRepositoryCustom;
 import com.monew.monew_server.domain.article.repository.ArticleViewRepository;
 import com.monew.monew_server.domain.article.storage.S3BinaryStorage;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
+import com.monew.monew_server.domain.interest.entity.ArticleInterest;
+import com.monew.monew_server.domain.interest.entity.Interest;
+import com.monew.monew_server.domain.interest.entity.InterestKeyword;
+import com.monew.monew_server.domain.interest.repository.InterestKeywordRepository;
+import com.monew.monew_server.domain.interest.repository.InterestRepository;
 import com.monew.monew_server.domain.user.entity.User;
-import com.monew.monew_server.exception.ArticleNotFoundException;
-import com.monew.monew_server.exception.BusinessException;
-import com.monew.monew_server.exception.ErrorCode;
+import com.monew.monew_server.exception.ArticleException;
 
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
@@ -51,13 +54,18 @@ public class ArticleService {
 	private final CommentRepository commentRepository;
 	private final S3BinaryStorage s3BinaryStorage;
 	private final ObjectMapper objectMapper;
+	private final InterestRepository interestRepository;
+	private final ArticleInterestRepository articleInterestRepository;
+	private final InterestKeywordRepository interestKeywordRepository;
 
 	public ArticleService(
 		ArticleRepository articleRepository,
 		@Qualifier("articleRepositoryImpl") ArticleRepositoryCustom articleRepositoryCustom,
 		ArticleMapper articleMapper,
 		ArticleViewRepository articleViewRepository,
-		CommentRepository commentRepository, S3BinaryStorage s3BinaryStorage
+		CommentRepository commentRepository, S3BinaryStorage s3BinaryStorage,
+		InterestRepository interestRepository, ArticleInterestRepository articleInterestRepository,
+		InterestKeywordRepository interestKeywordRepository
 	) {
 		this.articleRepository = articleRepository;
 		this.articleRepositoryCustom = articleRepositoryCustom;
@@ -66,6 +74,9 @@ public class ArticleService {
 		this.commentRepository = commentRepository;
 		this.s3BinaryStorage = s3BinaryStorage;
 		this.objectMapper = new ObjectMapper();
+		this.interestRepository = interestRepository;
+		this.articleInterestRepository = articleInterestRepository;
+		this.interestKeywordRepository = interestKeywordRepository;
 	}
 
 	private static final int DEFAULT_PAGE_SIZE = 10;
@@ -95,55 +106,55 @@ public class ArticleService {
 		List<ArticleResponse> enrichedResponses = allResponses.stream().map(resp ->
 			new ArticleResponse(
 				resp.id(),
-				resp.title(),
-				resp.summary(),
+				resp.source(),
 				resp.sourceUrl(),
+				resp.title(),
 				resp.publishDate(),
+				resp.summary(),
 				commentCounts.getOrDefault(resp.id(), resp.commentCount() != null ? resp.commentCount() : 0L),
 				viewCounts.getOrDefault(resp.id(), resp.viewCount() != null ? resp.viewCount() : 0L),
 				viewedArticleIds.contains(resp.id())
 			)
 		).toList();
 
-		ArticleSortType sortBy;
-		try {
-			sortBy = ArticleSortType.valueOf(
-				Optional.ofNullable(request.orderBy()).orElse("DATE").toUpperCase()
-			);
-		} catch (IllegalArgumentException e) {
-			sortBy = ArticleSortType.DATE;
-		}
+		ArticleSortType sortBy = parseSortType(request.orderBy());
+
+		log.info("Parsed sortBy: {} from orderBy: {}", sortBy, request.orderBy());
 
 		String nextCursor = null;
 		String nextAfterString = null;
 		List<ArticleResponse> finalContentList = enrichedResponses;
 
 		if (hasNext) {
-			// 마지막 항목 (실제로는 limit+1 번째 항목)
 			ArticleResponse lastArticle = enrichedResponses.get(requestedSize);
-
-			// nextCursor는 정렬 기준 값으로 설정 (Interest 방식)
 			switch (sortBy) {
-				case DATE -> nextCursor = lastArticle.publishDate().toString();
-				case COMMENT_COUNT -> nextCursor = String.valueOf(
-					lastArticle.commentCount() != null ? lastArticle.commentCount() : 0
-				);
-				case VIEW_COUNT -> nextCursor = String.valueOf(
-					lastArticle.viewCount() != null ? lastArticle.viewCount() : 0
-				);
+				case DATE -> {
+					nextCursor = lastArticle.publishDate().toString();
+				}
+				case COMMENT_COUNT -> {
+					nextCursor = String.valueOf(
+						lastArticle.commentCount() != null ? lastArticle.commentCount() : 0L
+					);
+				}
+				case VIEW_COUNT -> {
+					nextCursor = String.valueOf(
+						lastArticle.viewCount() != null ? lastArticle.viewCount() : 0L
+					);
+				}
 			}
 
-			// nextAfter는 tie-breaker용 (publishDate)
 			nextAfterString = lastArticle.publishDate().toString();
 
-			// 실제 반환할 데이터는 limit 개수만큼만
+			log.info("Generated nextCursor: {}, nextAfter: {} for sortBy: {}",
+				nextCursor, nextAfterString, sortBy);
+
 			finalContentList = enrichedResponses.subList(0, requestedSize);
 		}
 
 		if (finalContentList.isEmpty()
 			&& request.keyword() != null && !request.keyword().isBlank()
 			&& (request.cursor() == null || request.cursor().isBlank())) {
-			throw new ArticleNotFoundException("검색 결과가 없습니다.");
+			throw new ArticleException();
 		}
 
 		return new CursorPageResponseArticleDto(
@@ -156,10 +167,30 @@ public class ArticleService {
 		);
 	}
 
+	private ArticleSortType parseSortType(String orderBy) {
+		if (orderBy == null || orderBy.isBlank()) {
+			return ArticleSortType.DATE;
+		}
+
+		String enumName = switch (orderBy.toLowerCase()) {
+			case "viewcount" -> "VIEW_COUNT";
+			case "commentcount" -> "COMMENT_COUNT";
+			case "publishdate", "date" -> "DATE";
+			default -> orderBy.toUpperCase();
+		};
+
+		try {
+			return ArticleSortType.valueOf(enumName);
+		} catch (IllegalArgumentException e) {
+			log.warn("Invalid orderBy value: {}, using DATE as default", orderBy);
+			return ArticleSortType.DATE;
+		}
+	}
+
 	@Transactional
 	public ArticleResponse getArticleById(UUID articleId, UUID userId) {
 		Article article = articleRepositoryCustom.findArticleById(articleId)
-			.orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
+			.orElseThrow(() -> new ArticleException());
 
 		if (userId != null && !articleViewRepository.existsByArticleIdAndUserId(articleId, userId)) {
 			User userRef = entityManager.getReference(User.class, userId);
@@ -173,9 +204,9 @@ public class ArticleService {
 		return articleMapper.toResponse(article, viewCount, commentCount, viewedByMe);
 	}
 
-	public List<ArticleSourceDto> getAllSources() {
+	public List<String> getAllSources() {
 		return Arrays.stream(ArticleSource.values())
-			.map(source -> new ArticleSourceDto(source.name()))
+			.map(ArticleSource::name)
 			.toList();
 	}
 
@@ -184,7 +215,7 @@ public class ArticleService {
 		System.out.println("Received User ID in Service: " + userId);
 
 		Article article = articleRepositoryCustom.findArticleById(articleId)
-			.orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
+			.orElseThrow(() -> new ArticleException());
 
 		if (userId != null && !articleViewRepository.existsByArticleIdAndUserId(articleId, userId)) {
 			User userRef = entityManager.getReference(User.class, userId);
@@ -195,7 +226,7 @@ public class ArticleService {
 	@Transactional
 	public void softDeleteArticle(UUID articleId) {
 		Article article = articleRepositoryCustom.findByIdAndDeletedAtIsNull(articleId)
-			.orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
+			.orElseThrow(() -> new ArticleException());
 		System.out.println(entityManager.contains(article));
 		article.softDelete();
 		articleRepository.save(article);
@@ -204,7 +235,7 @@ public class ArticleService {
 	@Transactional
 	public void hardDeleteArticle(UUID articleId) {
 		Article article = articleRepository.findById(articleId)
-			.orElseThrow(() -> new BusinessException(ErrorCode.ARTICLE_NOT_FOUND));
+			.orElseThrow(() -> new ArticleException());
 
 		articleRepository.delete(article);
 	}
@@ -213,6 +244,21 @@ public class ArticleService {
 	public List<ArticleRestoreResult> restoreArticles(LocalDateTime from, LocalDateTime to) {
 		List<ArticleRestoreResult> results = new ArrayList<>();
 		LocalDateTime current = from;
+
+		List<Interest> allInterests = interestRepository.findAll();
+
+		if (allInterests.isEmpty()) {
+			log.warn("DB에 등록된 관심사(Interest)가 없어 기사-관심사 연결을 건너뜁니다.");
+		}
+
+		List<UUID> interestIds = allInterests.stream()
+			.map(Interest::getId)
+			.toList();
+
+		List<InterestKeyword> allKeywords = interestKeywordRepository.findByInterestIdIn(interestIds);
+
+		Map<UUID, List<InterestKeyword>> keywordsByInterestId = allKeywords.stream()
+			.collect(Collectors.groupingBy(k -> k.getInterest().getId()));
 
 		while (!current.isAfter(to)) {
 			try {
@@ -253,16 +299,54 @@ public class ArticleService {
 				if (!newArticles.isEmpty()) {
 					articleRepository.saveAll(newArticles);
 
+					List<ArticleInterest> articleInterestsToSave = new ArrayList<>();
+
+					if (!allInterests.isEmpty()) {
+						for (Article article : newArticles) {
+							String titleLower = article.getTitle() != null
+								? article.getTitle().toLowerCase()
+								: "";
+							String summaryLower = article.getSummary() != null
+								? article.getSummary().toLowerCase()
+								: "";
+							String contentToMatch = titleLower + " " + summaryLower;
+
+							for (Interest interest : allInterests) {
+								List<InterestKeyword> keywords = keywordsByInterestId
+									.getOrDefault(interest.getId(), List.of());
+
+								boolean hasMatchingKeyword = keywords.stream()
+									.anyMatch(keyword -> {
+										String keywordLower = keyword.getName().toLowerCase();
+										return contentToMatch.contains(keywordLower);
+									});
+
+								if (hasMatchingKeyword) {
+									ArticleInterest articleInterest = ArticleInterest.of(article, interest);
+									articleInterestsToSave.add(articleInterest);
+									log.debug("기사 '{}' 와 관심사 '{}' 연결",
+										article.getTitle(), interest.getName());
+								}
+							}
+						}
+
+						if (!articleInterestsToSave.isEmpty()) {
+							articleInterestRepository.saveAll(articleInterestsToSave);
+						}
+					}
+
 					results.add(new ArticleRestoreResult(
 						LocalDateTime.now(),
 						newArticles.stream().map(Article::getId).toList(),
 						newArticles.size()
 					));
 
-					log.info("{} 날짜 복구 완료 (총 {}건 중 {}건 신규 저장)",
+					log.info("{} 날짜 복구 완료 (총 {}건 중 {}건 신규 저장, {}개 관심사 연결)",
 						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
 						backupArticles.size(),
-						newArticles.size());
+						newArticles.size(),
+						articleInterestsToSave.size()
+					);
 				} else {
 					log.info("{} 날짜 모든 기사가 이미 존재합니다.",
 						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
@@ -272,11 +356,8 @@ public class ArticleService {
 				log.error("{} 날짜 복구 중 오류 발생",
 					current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), e);
 			}
-
 			current = current.plusDays(1);
 		}
-
 		return results;
 	}
-
 }

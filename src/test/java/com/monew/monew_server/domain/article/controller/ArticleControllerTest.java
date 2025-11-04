@@ -24,8 +24,8 @@ import org.springframework.test.web.servlet.MockMvc;
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
 import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
-import com.monew.monew_server.domain.article.dto.ArticleSourceDto;
 import com.monew.monew_server.domain.article.dto.CursorPageResponseArticleDto;
+import com.monew.monew_server.domain.article.entity.ArticleSource;
 import com.monew.monew_server.domain.article.service.ArticleService;
 
 @WebMvcTest(
@@ -52,10 +52,10 @@ class ArticleControllerTest {
 	@DisplayName("전체 뉴스 목록 조회 성공")
 	void shouldReturnArticles_whenGetArticles() throws Exception {
 		ArticleResponse article1 = new ArticleResponse(
-			ARTICLE_ID_1, "기사 제목 1", "기사 요약 1", "NAVER", Instant.now(), 10L, 2L, true
+			ARTICLE_ID_1, ArticleSource.NAVER, "http://naver.com/1", "기사 제목 1", Instant.now(), "기사 요약 1", 10L, 2L, true
 		);
 		ArticleResponse article2 = new ArticleResponse(
-			ARTICLE_ID_2, "기사 제목 2", "기사 요약 2", "CHOSUN", Instant.now(), 5L, 0L, false
+			ARTICLE_ID_2, ArticleSource.CHOSUN, "http://naver.com/2", "기사 제목 2", Instant.now(), "기사 요약 2", 5L, 0L, false
 		);
 
 		CursorPageResponseArticleDto mockResponse = CursorPageResponseArticleDto.builder()
@@ -79,7 +79,7 @@ class ArticleControllerTest {
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.content.length()").value(2))
 			.andExpect(jsonPath("$.content[0].title").value("기사 제목 1"))
-			.andExpect(jsonPath("$.content[1].sourceUrl").value("CHOSUN"));
+			.andExpect(jsonPath("$.content[1].sourceUrl").value("http://naver.com/2"));
 	}
 
 	@Test
@@ -87,7 +87,7 @@ class ArticleControllerTest {
 	void shouldFilterArticlesByKeyword() throws Exception {
 		UUID articleId = UUID.fromString("00000000-0000-0000-0000-000000000004");
 		ArticleResponse filteredArticle = new ArticleResponse(
-			articleId, "삼성전자 실적 상승", "경제 뉴스", "HANKYUNG", Instant.now(), 3L, 1L, false
+			articleId, ArticleSource.NAVER, "http://naver.com/1", "삼성전자 실적 상승", Instant.now(), "경제 뉴스", 3L, 1L, false
 		);
 
 		CursorPageResponseArticleDto mockResponse = CursorPageResponseArticleDto.builder()
@@ -116,9 +116,9 @@ class ArticleControllerTest {
 	@DisplayName("단일 기사 조회 성공")
 	void shouldReturnSingleArticle_whenGetArticleById() throws Exception {
 		ArticleResponse article = new ArticleResponse(
-			ARTICLE_ID_1, "단일 기사", "요약", "NAVER", Instant.now(),
-			5L,   // commentCount
-			10L,  // viewCount (순서 수정!)
+			ARTICLE_ID_1, ArticleSource.NAVER, "http://naver.com/1", "단일 기사", Instant.now(), "요약",
+			5L,
+			10L,
 			true
 		);
 		when(articleService.getArticleById(any(UUID.class), any(UUID.class)))
@@ -128,7 +128,7 @@ class ArticleControllerTest {
 				.header("Monew-Request-User-ID", ARTICLE_ID_2.toString()))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.title").value("단일 기사"))
-			.andExpect(jsonPath("$.commentCount").value(5))  // 추가 검증
+			.andExpect(jsonPath("$.commentCount").value(5))
 			.andExpect(jsonPath("$.viewCount").value(10));
 	}
 
@@ -143,18 +143,17 @@ class ArticleControllerTest {
 	}
 
 	@Test
-	@DisplayName("기사 소스 목록 조회 성공")
-	void shouldReturnArticleSources() throws Exception {
-		List<ArticleSourceDto> mockSources = List.of(
-			new ArticleSourceDto("NAVER"),
-			new ArticleSourceDto("HANKYUNG")
-		);
+	@DisplayName("기사 소스 목록 조회 성공 (String List 형식)")
+	void shouldReturnArticleSourcesAsStringList() throws Exception {
+		List<String> mockSources = List.of("NAVER", "HANKYUNG");
+
 		when(articleService.getAllSources()).thenReturn(mockSources);
 
 		mockMvc.perform(get("/api/articles/sources"))
 			.andExpect(status().isOk())
-			.andExpect(jsonPath("$[0].name").value("NAVER"))
-			.andExpect(jsonPath("$[1].name").value("HANKYUNG"));
+
+			.andExpect(jsonPath("$[0]").value("NAVER"))
+			.andExpect(jsonPath("$[1]").value("HANKYUNG"));
 	}
 
 	@Test
@@ -175,7 +174,6 @@ class ArticleControllerTest {
 			.andExpect(status().isNoContent());
 	}
 
-	// ✅ 8. 복구 API 테스트
 	@Test
 	@DisplayName("기사 복구 API 성공")
 	void shouldRestoreArticles() throws Exception {
@@ -279,7 +277,7 @@ class ArticleControllerTest {
 	@DisplayName("단일 기사 조회 시 User-ID 헤더 없이도 정상 처리")
 	void shouldGetArticleByIdWithoutUserIdHeader() throws Exception {
 		ArticleResponse article = new ArticleResponse(
-			ARTICLE_ID_1, "단일 기사", "요약", "NAVER", Instant.now(), 5L, 10L, false
+			ARTICLE_ID_1, ArticleSource.NAVER, "http://naver.com/1", "단일 기사", Instant.now(), "요약", 5L, 10L, false
 		);
 		when(articleService.getArticleById(eq(ARTICLE_ID_1), isNull()))
 			.thenReturn(article);
@@ -295,7 +293,7 @@ class ArticleControllerTest {
 	@DisplayName("단일 기사 조회 시 잘못된 UUID 헤더 처리")
 	void shouldGetArticleByIdWithInvalidUserIdHeader() throws Exception {
 		ArticleResponse article = new ArticleResponse(
-			ARTICLE_ID_1, "단일 기사", "요약", "NAVER", Instant.now(), 5L, 10L, false
+			ARTICLE_ID_1, ArticleSource.NAVER, "단일 기사", "요약", Instant.now(), "NAVER", 5L, 10L, false
 		);
 		when(articleService.getArticleById(eq(ARTICLE_ID_1), isNull()))
 			.thenReturn(article);

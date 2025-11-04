@@ -49,19 +49,24 @@ class ArticleRepositoryTest {
 	void shouldFindArticlesWithDateAscAndCursor() {
 		Article article1 = createArticle("기사1", Instant.parse("2025-10-25T10:00:00Z"));
 		Article article2 = createArticle("기사2", Instant.parse("2025-10-26T10:00:00Z"));
-		articleRepository.saveAll(List.of(article1, article2));
+		Article article3 = createArticle("기사3", Instant.parse("2025-10-27T10:00:00Z"));
+		articleRepository.saveAll(List.of(article1, article2, article3));
 
+		// ✅ cursor는 정렬 기준 값(publishDate)을 사용!
 		ArticleRequest request = new ArticleRequest(
 			null, null, null, null, null,
 			"DATE", "ASC",
-			article1.getId().toString(),
+			article1.getPublishDate().toString(),  // ✅ ID가 아닌 publishDate!
 			LocalDateTime.ofInstant(article1.getPublishDate(), ZoneOffset.UTC),
 			10
 		);
 
 		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
 
+		// article1보다 publishDate가 큰 것들만 조회되어야 함
 		assertThat(result).isNotEmpty();
+		assertThat(result).hasSize(2);  // article2, article3
+		assertThat(result.get(0).getTitle()).isEqualTo("기사2");
 		assertThat(result.get(0).getPublishDate()).isAfter(article1.getPublishDate());
 	}
 
@@ -70,33 +75,37 @@ class ArticleRepositoryTest {
 	void shouldFindArticlesWithDateDescAndCursor() {
 		Article article1 = createArticle("기사1", Instant.parse("2025-10-25T10:00:00Z"));
 		Article article2 = createArticle("기사2", Instant.parse("2025-10-26T10:00:00Z"));
-		articleRepository.saveAll(List.of(article1, article2));
+		Article article3 = createArticle("기사3", Instant.parse("2025-10-27T10:00:00Z"));
+		articleRepository.saveAll(List.of(article1, article2, article3));
 
 		ArticleRequest request = new ArticleRequest(
 			null, null, null, null, null,
 			"DATE", "DESC",
-			article2.getId().toString(),
-			LocalDateTime.ofInstant(article2.getPublishDate(), ZoneOffset.UTC),
+			article3.getPublishDate().toString(),
+			LocalDateTime.ofInstant(article3.getPublishDate(), ZoneOffset.UTC),
 			10
 		);
 
 		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
 
-		assertThat(result).hasSize(1);
+		assertThat(result).isNotEmpty();
+		assertThat(result).hasSize(2);
+		assertThat(result.get(0).getTitle()).isEqualTo("기사2");
 	}
 
 	@Test
 	@DisplayName("VIEW_COUNT 정렬 ASC - cursor와 after 있을 때")
 	void shouldFindArticlesWithViewCountAscAndCursor() {
-		Article article = createArticle("기사", Instant.now());
-		articleRepository.save(article);
+		Article article1 = createArticle("기사1", Instant.parse("2025-10-25T10:00:00Z"));
+		Article article2 = createArticle("기사2", Instant.parse("2025-10-26T10:00:00Z"));
+		Article article3 = createArticle("기사3", Instant.parse("2025-10-27T10:00:00Z"));
+		articleRepository.saveAll(List.of(article1, article2, article3));
 
-		// VIEW_COUNT의 after 값은 숫자이므로 더미 LocalDateTime 사용
 		ArticleRequest request = new ArticleRequest(
 			null, null, null, null, null,
 			"VIEW_COUNT", "ASC",
-			article.getId().toString(),
-			LocalDateTime.of(2025, 1, 1, 0, 0, 5), // 초 단위를 after 값처럼 사용
+			"5",
+			LocalDateTime.ofInstant(article1.getPublishDate(), ZoneOffset.UTC),  // ✅ publishDate
 			10
 		);
 
@@ -108,21 +117,24 @@ class ArticleRepositoryTest {
 	@Test
 	@DisplayName("VIEW_COUNT 정렬 DESC - cursor와 after 있을 때")
 	void shouldFindArticlesWithViewCountDescAndCursor() {
-		Article article = createArticle("기사", Instant.now());
-		articleRepository.save(article);
+		Article article1 = createArticle("기사1", Instant.parse("2025-10-25T10:00:00Z"));
+		Article article2 = createArticle("기사2", Instant.parse("2025-10-26T10:00:00Z"));
+		Article article3 = createArticle("기사3", Instant.parse("2025-10-27T10:00:00Z"));
+		articleRepository.saveAll(List.of(article1, article2, article3));
 
-		// VIEW_COUNT의 after 값은 숫자이므로 더미 LocalDateTime 사용
+		// cursor=100 (조회수)으로 조회
 		ArticleRequest request = new ArticleRequest(
 			null, null, null, null, null,
 			"VIEW_COUNT", "DESC",
-			article.getId().toString(),
-			LocalDateTime.of(2025, 1, 1, 0, 0, 10), // 초 단위를 after 값처럼 사용
+			"100",  // ✅ 조회수 (숫자)
+			LocalDateTime.ofInstant(article2.getPublishDate(), ZoneOffset.UTC),
 			10
 		);
 
 		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
 
-		assertThat(result).isNotNull();
+		// viewCount < 100 인 것들만 조회되어야 함
+		assertThat(result).isNotEmpty();
 	}
 
 	@Test
@@ -262,7 +274,7 @@ class ArticleRepositoryTest {
 		ArticleRequest request = new ArticleRequest(
 			null, null, null, null, null,
 			"VIEW_COUNT", "DESC",
-			article.getId().toString(),
+			"100",
 			LocalDateTime.parse("2025-10-27T10:30:00"), // 숫자로 파싱 불가
 			10
 		);
@@ -466,5 +478,345 @@ class ArticleRepositoryTest {
 			.publishDate(Instant.now())
 			.createdAt(Instant.now())
 			.build();
+	}
+
+	@Test
+	@DisplayName("COMMENT_COUNT 정렬 DESC")
+	void shouldFindArticlesWithCommentCountDesc() {
+		Article article = createArticle("기사", Instant.now());
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"COMMENT_COUNT", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("COMMENT_COUNT 정렬 ASC - cursor와 after 있을 때")
+	void shouldFindArticlesWithCommentCountAscAndCursor() {
+		Article article1 = createArticle("기사1", Instant.parse("2025-10-25T10:00:00Z"));
+		Article article2 = createArticle("기사2", Instant.parse("2025-10-26T10:00:00Z"));
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"COMMENT_COUNT", "ASC",
+			"3",
+			LocalDateTime.ofInstant(article1.getPublishDate(), ZoneOffset.UTC),
+			10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).isNotNull();
+	}
+
+	@Test
+	@DisplayName("COMMENT_COUNT 정렬 DESC - cursor와 after 있을 때")
+	void shouldFindArticlesWithCommentCountDescAndCursor() {
+		Article article1 = createArticle("기사1", Instant.parse("2025-10-25T10:00:00Z"));
+		Article article2 = createArticle("기사2", Instant.parse("2025-10-26T10:00:00Z"));
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"COMMENT_COUNT", "DESC",
+			"50",
+			LocalDateTime.ofInstant(article2.getPublishDate(), ZoneOffset.UTC),
+			10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).isNotNull();
+	}
+
+	@Test
+	@DisplayName("keyword 필터링 - title에서 검색")
+	void shouldFilterByKeywordInTitle() {
+		Article article1 = createArticle("경제 뉴스", Instant.now());
+		Article article2 = createArticle("정치 소식", Instant.now());
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			"경제", null, null, null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getTitle()).contains("경제");
+	}
+
+	@Test
+	@DisplayName("keyword 필터링 - summary에서 검색")
+	void shouldFilterByKeywordInSummary() {
+		Article article1 = Article.builder()
+			.title("제목1")
+			.summary("이것은 경제 관련 요약입니다")
+			.source(ArticleSource.NAVER)
+			.sourceUrl("http://test.com/" + UUID.randomUUID())
+			.publishDate(Instant.now())
+			.createdAt(Instant.now())
+			.build();
+		Article article2 = createArticle("제목2", Instant.now());
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			"경제", null, null, null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getSummary()).contains("경제");
+	}
+
+	@Test
+	@DisplayName("keyword가 빈 문자열일 때 필터링 안 함")
+	void shouldNotFilterWhenKeywordIsBlank() {
+		Article article1 = createArticle("기사1", Instant.now());
+		Article article2 = createArticle("기사2", Instant.now());
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			"   ", null, null, null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(2);
+	}
+
+	@Test
+	@DisplayName("sourceIn에 [OBJECT OBJECT] 포함 시 필터링")
+	void shouldFilterOutObjectObjectInSourceIn() {
+		Article article = createArticleWithSource("기사", ArticleSource.NAVER);
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, List.of("NAVER", "[OBJECT OBJECT]"), null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("sourceIn이 모두 유효하지 않을 때 조건 추가 안 함")
+	void shouldNotAddConditionWhenAllSourcesInvalid() {
+		Article article = createArticleWithSource("기사", ArticleSource.NAVER);
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, List.of("INVALID1", "INVALID2", "[OBJECT OBJECT]"), null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		// 유효한 source가 없으므로 sourceIn 조건이 추가되지 않아 모든 기사 조회
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("sourceIn이 빈 리스트일 때")
+	void shouldHandleEmptySourceIn() {
+		Article article = createArticleWithSource("기사", ArticleSource.NAVER);
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, List.of(), null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("direction이 null일 때 DESC로 기본값 처리")
+	void shouldUseDescAsDefaultDirection() {
+		Article article1 = createArticle("기사1", Instant.parse("2025-10-25T10:00:00Z"));
+		Article article2 = createArticle("기사2", Instant.parse("2025-10-26T10:00:00Z"));
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"DATE", null, null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(2);
+		// DESC이므로 최신 기사가 먼저
+		assertThat(result.get(0).getTitle()).isEqualTo("기사2");
+	}
+
+	@Test
+	@DisplayName("orderBy가 'viewCount'일 때 VIEW_COUNT로 매핑")
+	void shouldMapViewCountString() {
+		Article article = createArticle("기사", Instant.now());
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"viewCount", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("orderBy가 'commentCount'일 때 COMMENT_COUNT로 매핑")
+	void shouldMapCommentCountString() {
+		Article article = createArticle("기사", Instant.now());
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"commentCount", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("countArticlesWithFilter - keyword가 있을 때")
+	void shouldCountWithKeyword() {
+		Article article1 = createArticle("경제 뉴스", Instant.now());
+		Article article2 = createArticle("정치 소식", Instant.now());
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			"경제", null, null, null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		long count = articleRepositoryCustom.countArticlesWithFilter(request);
+
+		assertThat(count).isEqualTo(1);
+	}
+
+	@Test
+	@DisplayName("countArticlesWithFilter - 모든 필터 없을 때")
+	void shouldCountAllArticles() {
+		Article article1 = createArticle("기사1", Instant.now());
+		Article article2 = createArticle("기사2", Instant.now());
+		articleRepository.saveAll(List.of(article1, article2));
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		long count = articleRepositoryCustom.countArticlesWithFilter(request);
+
+		assertThat(count).isEqualTo(2);
+	}
+
+	@Test
+	@DisplayName("삭제된 기사는 조회하지 않음")
+	void shouldNotFindDeletedArticles() {
+		Article article1 = createArticle("기사1", Instant.now());
+		Article article2 = createArticle("기사2", Instant.now());
+		articleRepository.saveAll(List.of(article1, article2));
+
+		article1.softDelete();
+		articleRepository.save(article1);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, null, null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getId()).isEqualTo(article2.getId());
+	}
+
+	@Test
+	@DisplayName("case insensitive 키워드 검색 - 대소문자 무시")
+	void shouldSearchKeywordCaseInsensitive() {
+		Article article = createArticle("ECONOMY News", Instant.now());
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			"economy", null, null, null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("sourceIn 대소문자 처리 - 소문자로 들어와도 매칭")
+	void shouldHandleSourceInCaseInsensitive() {
+		Article article = createArticleWithSource("기사", ArticleSource.NAVER);
+		articleRepository.save(article);
+
+		ArticleRequest request = new ArticleRequest(
+			null, null, List.of("naver", "chosun"), null, null,
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+	}
+
+	@Test
+	@DisplayName("복합 필터링 - keyword + sourceIn + publishDate 범위")
+	void shouldFilterWithMultipleConditions() {
+		Article article1 = Article.builder()
+			.title("네이버 경제 뉴스")
+			.summary("요약")
+			.source(ArticleSource.NAVER)
+			.sourceUrl("http://test.com/1")
+			.publishDate(Instant.parse("2025-10-25T10:00:00Z"))
+			.createdAt(Instant.now())
+			.build();
+		Article article2 = Article.builder()
+			.title("조선 경제 소식")
+			.summary("요약")
+			.source(ArticleSource.CHOSUN)
+			.sourceUrl("http://test.com/2")
+			.publishDate(Instant.parse("2025-10-26T10:00:00Z"))
+			.createdAt(Instant.now())
+			.build();
+		Article article3 = createArticleWithSource("정치 뉴스", ArticleSource.NAVER);
+		articleRepository.saveAll(List.of(article1, article2, article3));
+
+		ArticleRequest request = new ArticleRequest(
+			"경제",
+			null,
+			List.of("NAVER"),
+			LocalDateTime.parse("2025-10-24T00:00:00"),
+			LocalDateTime.parse("2025-10-26T00:00:00"),
+			"DATE", "DESC", null, null, 10
+		);
+
+		List<Article> result = articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 10);
+
+		assertThat(result).hasSize(1);
+		assertThat(result.get(0).getTitle()).isEqualTo("네이버 경제 뉴스");
 	}
 }

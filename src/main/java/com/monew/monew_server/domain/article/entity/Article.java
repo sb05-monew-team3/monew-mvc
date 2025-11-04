@@ -3,6 +3,9 @@ package com.monew.monew_server.domain.article.entity;
 import java.time.Instant;
 import java.util.List;
 
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
@@ -39,7 +42,8 @@ import lombok.experimental.SuperBuilder;
 public class Article extends BaseDeletableEntity {
 
 	@Enumerated(EnumType.STRING)
-	@Column(nullable = false, length = 50)
+	@JdbcTypeCode(SqlTypes.VARCHAR)
+	@Column(name = "source", nullable = false)
 	private ArticleSource source;
 
 	@Column(columnDefinition = "text", nullable = false)

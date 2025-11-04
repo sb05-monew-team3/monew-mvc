@@ -3,7 +3,6 @@ package com.monew.monew_server.domain.notification.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.common.BaseUpdatableEntity;
 import com.monew.monew_server.domain.user.entity.User;
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -37,7 +36,6 @@ public class Notification extends BaseUpdatableEntity {
 	@JoinColumn(name = "user_id")
 	private User user;
 
-	@Column(columnDefinition = "text")
 	private String content;
 
 	@Enumerated(EnumType.STRING)

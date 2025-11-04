@@ -3,7 +3,6 @@ package com.monew.monew_server.domain.comment.entity;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.common.BaseEntity;
 import com.monew.monew_server.domain.user.entity.User;
-
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -34,10 +33,10 @@ import lombok.experimental.SuperBuilder;
 public class CommentLike extends BaseEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "comment_id", nullable = false)
+	@JoinColumn(name = "comment_id")
 	private Comment comment;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id", nullable = false)
+	@JoinColumn(name = "user_id")
 	private User user;
 }

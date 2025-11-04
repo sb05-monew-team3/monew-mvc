@@ -1,6 +1,6 @@
 spring:
   config:
-    import: optional:dotenv:.
+    import: optional:dotenv:.env
     activate:
       on-profile: local
   aws:
@@ -31,7 +31,7 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb+srv://${DB_MONGO_USERNAME}:${DB_MONGO_PASSWORD}@monewcluster.1hw0geh.mongodb.net/${DB_MONGO_DB}?retryWrites=true&w=majority&appName=monewCluster
+      uri: mongodb://localhost:27017/monewDB
   jpa:
     hibernate:
       ddl-auto: update
@@ -46,8 +46,6 @@ spring:
         jdbc.time_zone: UTC
     open-in-view: false
 
-
-
 logging:
   level:
     root: info
@@ -58,4 +56,3 @@ logging:
     org.springframework.web: info
     org.springframework.filter.CommonsRequestLoggingFilter: trace
     com.monew.monew_server: info
-

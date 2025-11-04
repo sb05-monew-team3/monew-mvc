@@ -1,9 +1,7 @@
 package com.monew.monew_server.domain.common;
 
-import java.time.Instant;
-
-import jakarta.persistence.Column;
 import jakarta.persistence.MappedSuperclass;
+import java.time.Instant;
 import lombok.AccessLevel;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -15,7 +13,6 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public abstract class BaseDeletableEntity extends BaseUpdatableEntity {
 
-	@Column(columnDefinition = "timestamp with time zone")
 	private Instant deletedAt;
 
 	public void softDelete() {

@@ -4,8 +4,6 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.article.entity.Article;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
 import com.monew.monew_server.domain.user.entity.User;
-
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.JoinColumn;
@@ -31,13 +29,12 @@ import lombok.experimental.SuperBuilder;
 public class Comment extends BaseDeletableEntity {
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "article_id", nullable = false)
+	@JoinColumn(name = "article_id")
 	private Article article;
 
 	@ManyToOne(fetch = FetchType.LAZY)
-	@JoinColumn(name = "user_id", nullable = false)
+	@JoinColumn(name = "user_id")
 	private User user;
 
-	@Column(columnDefinition = "text", nullable = false)
 	private String content;
 }

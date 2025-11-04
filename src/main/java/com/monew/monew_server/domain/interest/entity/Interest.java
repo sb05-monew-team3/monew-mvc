@@ -2,8 +2,6 @@ package com.monew.monew_server.domain.interest.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.common.BaseUpdatableEntity;
-
-import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 import lombok.AccessLevel;
@@ -25,6 +23,5 @@ import lombok.experimental.SuperBuilder;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Interest extends BaseUpdatableEntity {
 
-	@Column(nullable = false, length = 50)
 	private String name;
 }

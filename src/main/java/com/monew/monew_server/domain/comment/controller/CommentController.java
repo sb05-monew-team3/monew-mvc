@@ -7,15 +7,13 @@ import com.monew.monew_server.domain.comment.dto.CursorPageResponse;
 import com.monew.monew_server.domain.comment.service.CommentLikeService;
 import com.monew.monew_server.domain.comment.service.CommentService;
 import jakarta.validation.Valid;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import java.time.Instant;
-import java.util.UUID;
-
-
 
 @Slf4j
 @RestController
@@ -75,7 +73,7 @@ public class CommentController {
     @DeleteMapping("/{commentId}")
     public ResponseEntity<Void> deleteComment(
             @PathVariable UUID commentId,
-            @RequestHeader("Monew-Request-User-ID") UUID userId
+            @RequestHeader("Monew-Request-User-Id") UUID userId
     ) {
         log.info("DELETE /api/comments/{} - 논리 삭제 요청, userId={}", commentId, userId);
 
@@ -85,13 +83,10 @@ public class CommentController {
     }
 
     @DeleteMapping("/{commentId}/hard")
-    public ResponseEntity<Void> deleteHardComment(
-            @PathVariable UUID commentId,
-            @RequestHeader("Monew-Request-User-ID") UUID userId
-    ) {
-        log.info("DELETE /api/comments/{}/hard - 물리 삭제 요청, userId={}", commentId, userId);
+    public ResponseEntity<Void> deleteHardComment(@PathVariable UUID commentId) {
+        log.info("DELETE /api/comments/{}/hard - 물리 삭제 요청", commentId);
 
-        commentService.hardDeleteComment(commentId, userId);
+        commentService.hardDeleteComment(commentId);
 
         return ResponseEntity.noContent().build();
     }

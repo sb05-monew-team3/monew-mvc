@@ -1,9 +1,10 @@
 package com.monew.monew_server.exception;
 
+import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
-
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
@@ -12,9 +13,6 @@ import org.springframework.web.bind.MissingRequestHeaderException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
-
-import jakarta.servlet.http.HttpServletRequest;
-import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 @RestControllerAdvice
@@ -25,7 +23,7 @@ public class GlobalExceptionHandler {
 		log.error("예상 못한 예외 발생: {}", exception.getMessage(), exception);
 
 		ErrorResponse errorResponse = new ErrorResponse(exception, 500);
-		return ResponseEntity.status(errorResponse.getStatus()).body(errorResponse);
+		return ResponseEntity.status(errorResponse.status()).body(errorResponse);
 	}
 
 	@ExceptionHandler(BaseException.class)
@@ -40,7 +38,7 @@ public class GlobalExceptionHandler {
 	private HttpStatus determineHttpStatus(BaseException exception) {
 		ErrorCode errorCode = exception.getErrorCode();
 		return switch (errorCode) {
-			case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
+			case INVALID_REQUEST, INVALID_INPUT_VALUE -> HttpStatus.BAD_REQUEST;
 			case ARTICLE_NOT_FOUND,
 				 INTEREST_NOT_FOUND,
 				 NOTIFICATION_NOT_FOUND,
@@ -54,19 +52,19 @@ public class GlobalExceptionHandler {
 	public ResponseEntity<ErrorResponse> handleValidationExceptions(MethodArgumentNotValidException ex) {
 		log.error("요청 유효성 검사 실패: {}", ex.getMessage());
 
-		Map<String, Object> validationErrors = new HashMap<>();
+		Map<String, Object> details = new HashMap<>();
 		ex.getBindingResult().getAllErrors().forEach(error -> {
 			String fieldName = ((FieldError)error).getField();
 			String errorMessage = error.getDefaultMessage();
-			validationErrors.put(fieldName, errorMessage);
+			details.put(fieldName, errorMessage);
 		});
 
 		ErrorResponse response = new ErrorResponse(
 			Instant.now(),
-			"VALIDATION_ERROR",
-			"요청 데이터 유효성 검사에 실패했습니다",
-			validationErrors,
-			ex.getClass().getSimpleName(),
+			"INVALID_INPUT_VALUE",
+			"잘못된 입력값입니다.",
+			details,
+			"DomainException",
 			HttpStatus.BAD_REQUEST.value()
 		);
 

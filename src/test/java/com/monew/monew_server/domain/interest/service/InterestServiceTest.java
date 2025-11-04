@@ -202,7 +202,7 @@ class InterestServiceTest {
             () -> interestService.subscribe(fakeInterestId, user1.getId())
         );
 
-        assertThat(exception.getMessage()).contains("Interest not found");
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
 
         // DB 검증
         assertThat(subscriptionRepository.count()).isZero();
@@ -311,7 +311,7 @@ class InterestServiceTest {
 
         // 3. 예외 상세 내용 검증
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);
-        assertThat(exception.getMessage()).contains("Interest not found with id: " + fakeInterestId);
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
     }
 
     @Test
@@ -355,7 +355,7 @@ class InterestServiceTest {
 
         // 3. 예외 상세 내용 검증 (ErrorCode.INTEREST_NOT_FOUND는 getOrThrow에 정의됨)
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);
-        assertThat(exception.getMessage()).contains("Interest not found with id: " + fakeInterestId);
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
     }
 
     @Test
@@ -402,6 +402,6 @@ class InterestServiceTest {
 
         // 3. 예외 상세 내용 검증
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);
-        assertThat(exception.getMessage()).contains("Interest not found with id: " + fakeInterestId);
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
     }
 }

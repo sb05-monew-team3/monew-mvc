@@ -103,6 +103,6 @@ class InterestRepositoryTest {
 
         // 3. 예외의 상세 내용(ErrorCode, Message) 검증
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);
-        assertThat(exception.getMessage()).contains("Interest not found with id: " + nonExistentId);
+        assertThat(exception.getMessage()).contains("관심사를 찾을 수 없습니다.");
     }
 }

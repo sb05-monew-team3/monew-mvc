@@ -43,7 +43,8 @@ public class GlobalExceptionHandler {
 			case INVALID_REQUEST -> HttpStatus.BAD_REQUEST;
 			case ARTICLE_NOT_FOUND,
 				 INTEREST_NOT_FOUND,
-				 NOTIFICATION_NOT_FOUND -> HttpStatus.NOT_FOUND;
+				 NOTIFICATION_NOT_FOUND,
+				 USER_NOT_FOUND -> HttpStatus.NOT_FOUND;
 			case INTEREST_NAME_DUPLICATION -> HttpStatus.CONFLICT;
 			case INTERNAL_SERVER_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
 		};

@@ -1,16 +1,22 @@
 package com.monew.monew_server.domain.article.entity;
 
+import java.time.Instant;
+import java.util.List;
+
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
+
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.Instant;
-import java.util.List;
+import jakarta.persistence.Transient;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -31,6 +37,7 @@ import lombok.experimental.SuperBuilder;
 public class Article extends BaseDeletableEntity {
 
 	@Enumerated(EnumType.STRING)
+	@JdbcType(PostgreSQLEnumJdbcType.class)
 	private ArticleSource source;
 
 	private String sourceUrl;
@@ -38,14 +45,15 @@ public class Article extends BaseDeletableEntity {
 	private String title;
 
 	private String summary;
-
 	private Instant publishDate;
-
+	@Transient
+	private Boolean isNew = false;
 	@OneToMany(mappedBy = "article")
 	private List<ArticleInterest> articleInterests;
 
 	public static Article fromDto(ArticleSaveDto dto) {
 		return Article.builder()
+			.id(dto.getId())
 			.source(dto.getSource())
 			.sourceUrl(dto.getSourceUrl())
 			.title(dto.getTitle())

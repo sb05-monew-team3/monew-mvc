@@ -11,6 +11,7 @@ import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
 import com.monew.monew_server.domain.notification.dto.NotificationDto;
 import com.monew.monew_server.domain.notification.entity.Notification;
 import com.monew.monew_server.domain.notification.entity.NotificationResourceType;
+import com.monew.monew_server.domain.notification.mapper.NotificationMapper;
 import com.monew.monew_server.domain.notification.repository.NotificationRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
@@ -36,6 +37,9 @@ class NotificationServiceTest {
 
 	@Mock
 	private UserRepository userRepository;
+
+	@Mock
+	private NotificationMapper notificationMapper;
 
 	@InjectMocks
 	private NotificationService notificationService;

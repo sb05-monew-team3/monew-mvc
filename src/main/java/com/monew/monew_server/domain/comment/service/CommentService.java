@@ -5,17 +5,11 @@ import com.monew.monew_server.domain.comment.dto.CommentRegisterRequest;
 import com.monew.monew_server.domain.comment.dto.CommentUpdateRequest;
 import com.monew.monew_server.domain.comment.dto.CursorPageResponse;
 import com.monew.monew_server.domain.comment.entity.Comment;
-import com.monew.monew_server.domain.comment.entity.CommentLike;
 import com.monew.monew_server.domain.comment.repository.CommentLikeRepository;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
@@ -23,6 +17,10 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -225,20 +223,14 @@ public class CommentService {
 
 
     @Transactional
-    public void hardDeleteComment(UUID commentId, UUID userId) {
-        log.info("댓글 물리 삭제 요청: commentId={}, userId={}", commentId, userId);
+    public void hardDeleteComment(UUID commentId) {
+        log.info("댓글 물리 삭제 요청: commentId={}", commentId);
 
         // 1. 댓글 조회 (존재 여부 확인)
         Comment comment = commentRepository.findById(commentId)
                 .orElseThrow(() -> new EntityNotFoundException("댓글을 찾을 수 없습니다: " + commentId));
 
-        // 2. 사용자 본인인지 확인
-        if (!comment.getUser().getId().equals(userId)) {
-            log.warn("권한 없음: 댓글 작성자({})와 요청자({})가 다름", comment.getUser().getId(), userId);
-            throw new IllegalArgumentException("본인이 작성한 댓글만 삭제할 수 있습니다.");
-        }
-
-        // 3. 물리 삭제 실행 (DB에서 완전히 제거)
+        // 2. 물리 삭제 실행 (DB에서 완전히 제거)
         commentRepository.delete(comment);
 
         log.info("댓글 물리 삭제 완료: commentId={}", commentId);

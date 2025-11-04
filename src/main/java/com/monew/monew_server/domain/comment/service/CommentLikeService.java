@@ -7,6 +7,8 @@ import com.monew.monew_server.domain.comment.repository.CommentLikeRepository;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.notification.service.NotificationService;
 import com.monew.monew_server.domain.user.entity.User;
+import com.monew.monew_server.domain.user.repository.UserRepository;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +16,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Slf4j
@@ -25,6 +28,7 @@ public class CommentLikeService {
     private final CommentRepository commentRepository;
     private final EntityManager entityManager;
     private final NotificationService notificationService;
+	private final UserRepository userRepository;
 
     @Transactional
     public CommentLikeDto addLike(UUID commentId, UUID userId) {
@@ -45,9 +49,9 @@ public class CommentLikeService {
         }
 
         // 4. User 객체 가져오기 (userId만 있으면 되니까 getReference 사용)
-        User user = entityManager.getReference(User.class, userId);
+		User user = userRepository.findById(userId).orElseThrow();
 
-        // 5. CommentLike 엔티티 생성
+		// 5. CommentLike 엔티티 생성
         CommentLike commentLike = CommentLike.builder()
                 .comment(comment)
                 .user(user)

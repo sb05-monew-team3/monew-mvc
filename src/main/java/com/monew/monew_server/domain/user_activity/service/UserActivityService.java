@@ -143,7 +143,7 @@ public class UserActivityService {
 					.source(article.getSource().name())
 					.sourceUrl(article.getSourceUrl())
 					.articleTitle(article.getTitle())
-					.articlePublishDate(article.getPublishDate())
+					.articlePublishedDate(article.getPublishDate())
 					.articleSummary(article.getSummary())
 					.articleCommentCount(commentCount)
 					.articleViewCount(viewCount)

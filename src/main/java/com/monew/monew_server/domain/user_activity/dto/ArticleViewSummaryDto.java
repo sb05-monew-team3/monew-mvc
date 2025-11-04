@@ -16,7 +16,7 @@ public class ArticleViewSummaryDto {
 	private String source;
 	private String sourceUrl;
 	private String articleTitle;
-	private Instant articlePublishDate;
+	private Instant articlePublishedDate;
 	private String articleSummary;
 	private long articleCommentCount;
 	private long articleViewCount;

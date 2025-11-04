@@ -4,7 +4,6 @@ import java.util.List;
 
 import org.mapstruct.Mapper;
 import org.mapstruct.Mapping;
-import org.mapstruct.factory.Mappers;
 
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user_activity.dto.ArticleViewSummaryDto;

@@ -1,19 +1,5 @@
 package com.monew.monew_server.domain.article.service;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
-
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
-
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
 import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
@@ -28,6 +14,8 @@ import com.monew.monew_server.domain.article.repository.ArticleInterestRepositor
 import com.monew.monew_server.domain.article.repository.ArticleRepository;
 import com.monew.monew_server.domain.article.repository.ArticleRepositoryCustom;
 import com.monew.monew_server.domain.article.repository.ArticleViewRepository;
+import com.monew.monew_server.domain.article.repository.projection.CommentCountProjection;
+import com.monew.monew_server.domain.article.repository.projection.ViewCountProjection;
 import com.monew.monew_server.domain.article.storage.S3BinaryStorage;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
@@ -37,11 +25,21 @@ import com.monew.monew_server.domain.interest.repository.InterestKeywordReposito
 import com.monew.monew_server.domain.interest.repository.InterestRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.exception.ArticleException;
-
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
@@ -53,7 +51,6 @@ public class ArticleService {
 	private final ArticleViewRepository articleViewRepository;
 	private final CommentRepository commentRepository;
 	private final S3BinaryStorage s3BinaryStorage;
-	private final ObjectMapper objectMapper;
 	private final InterestRepository interestRepository;
 	private final ArticleInterestRepository articleInterestRepository;
 	private final InterestKeywordRepository interestKeywordRepository;
@@ -73,7 +70,6 @@ public class ArticleService {
 		this.articleViewRepository = articleViewRepository;
 		this.commentRepository = commentRepository;
 		this.s3BinaryStorage = s3BinaryStorage;
-		this.objectMapper = new ObjectMapper();
 		this.interestRepository = interestRepository;
 		this.articleInterestRepository = articleInterestRepository;
 		this.interestKeywordRepository = interestKeywordRepository;
@@ -96,12 +92,13 @@ public class ArticleService {
 		List<UUID> articleIds = fetchedArticles.stream().map(Article::getId).toList();
 
 		var viewCounts = articleViewRepository.findViewCountsByArticleIds(articleIds)
-			.stream().collect(Collectors.toMap(v -> v.getArticleId(), v -> v.getViewCount()));
+			.stream().collect(Collectors.toMap(ViewCountProjection::getArticleId, ViewCountProjection::getViewCount));
 
 		var viewedArticleIds = articleViewRepository.findArticleIdsViewedByUser(articleIds, currentUserId);
 
 		var commentCounts = commentRepository.findCommentCountsByArticleIds(articleIds)
-			.stream().collect(Collectors.toMap(c -> c.getArticleId(), c -> c.getCommentCount()));
+			.stream().collect(Collectors.toMap(CommentCountProjection::getArticleId,
+                CommentCountProjection::getCommentCount));
 
 		List<ArticleResponse> enrichedResponses = allResponses.stream().map(resp ->
 			new ArticleResponse(
@@ -190,7 +187,7 @@ public class ArticleService {
 	@Transactional
 	public ArticleResponse getArticleById(UUID articleId, UUID userId) {
 		Article article = articleRepositoryCustom.findArticleById(articleId)
-			.orElseThrow(() -> new ArticleException());
+			.orElseThrow(ArticleException::new);
 
 		if (userId != null && !articleViewRepository.existsByArticleIdAndUserId(articleId, userId)) {
 			User userRef = entityManager.getReference(User.class, userId);
@@ -226,7 +223,7 @@ public class ArticleService {
 	@Transactional
 	public void softDeleteArticle(UUID articleId) {
 		Article article = articleRepositoryCustom.findByIdAndDeletedAtIsNull(articleId)
-			.orElseThrow(() -> new ArticleException());
+			.orElseThrow(ArticleException::new);
 		System.out.println(entityManager.contains(article));
 		article.softDelete();
 		articleRepository.save(article);
@@ -235,7 +232,7 @@ public class ArticleService {
 	@Transactional
 	public void hardDeleteArticle(UUID articleId) {
 		Article article = articleRepository.findById(articleId)
-			.orElseThrow(() -> new ArticleException());
+			.orElseThrow(ArticleException::new);
 
 		articleRepository.delete(article);
 	}

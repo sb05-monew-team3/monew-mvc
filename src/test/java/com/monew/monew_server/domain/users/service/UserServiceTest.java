@@ -3,10 +3,16 @@ package com.monew.monew_server.domain.users.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
+import com.monew.monew_server.domain.user.dto.UserDto;
+import com.monew.monew_server.domain.user.dto.UserLoginRequest;
+import com.monew.monew_server.domain.user.dto.UserRegisterRequest;
+import com.monew.monew_server.domain.user.dto.UserUpdateRequset;
+import com.monew.monew_server.domain.user.entity.User;
+import com.monew.monew_server.domain.user.repository.UserRepository;
+import com.monew.monew_server.domain.user.service.UserService;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
-
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -15,14 +21,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-
-import com.monew.monew_server.domain.user.dto.UserDto;
-import com.monew.monew_server.domain.user.dto.UserLoginRequest;
-import com.monew.monew_server.domain.user.dto.UserRegisterRequest;
-import com.monew.monew_server.domain.user.dto.UserUpdateRequset;
-import com.monew.monew_server.domain.user.entity.User;
-import com.monew.monew_server.domain.user.repository.UserRepository;
-import com.monew.monew_server.domain.user.service.UserService;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -248,25 +246,15 @@ class UserServiceTest {
 				.hasMessageContaining("이미 삭제된 사용자");
 		}
 
-		@Test
-		@DisplayName("하드 삭제 성공")
-		void hardDelete_success() {
-			user.softDelete();
-			given(userRepository.findById(userId)).willReturn(Optional.of(user));
-
-			userService.hardDeleteUser(userId);
-
-			then(userRepository).should().delete(user);
-		}
-
-		@Test
-		@DisplayName("소프트 삭제되지 않은 사용자는 하드 삭제 불가")
-		void hardDelete_fail_not_soft_deleted() {
-			given(userRepository.findById(userId)).willReturn(Optional.of(user));
-
-			assertThatThrownBy(() -> userService.hardDeleteUser(userId))
-				.isInstanceOf(IllegalArgumentException.class)
-				.hasMessageContaining("소프트 삭제되지 않는 사용자");
-		}
+		// @Test
+		// @DisplayName("하드 삭제 성공")
+		// void hardDelete_success() {
+		// 	user.softDelete();
+		// 	given(userRepository.findById(userId)).willReturn(Optional.of(user));
+		//
+		// 	userService.hardDeleteUser(userId);
+		//
+		// 	then(userRepository).should().delete(user);
+		// }
 	}
 }

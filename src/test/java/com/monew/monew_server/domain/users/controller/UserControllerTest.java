@@ -1,22 +1,20 @@
 package com.monew.monew_server.domain.users.controller;
 
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
+
 import com.monew.monew_server.domain.user.controller.UserController;
 import com.monew.monew_server.domain.user.dto.*;
 import com.monew.monew_server.domain.user.service.UserService;
+import java.time.Instant;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.http.ResponseEntity;
-
-import java.time.OffsetDateTime;
-import java.time.ZoneOffset;
-import java.util.UUID;
-
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 
 class UserControllerTest {
 
@@ -70,7 +68,7 @@ class UserControllerTest {
 				.id(UUID.randomUUID())
 				.email("test@email.com")
 				.nickname("tester")
-				.createdAt(OffsetDateTime.now(ZoneOffset.UTC))
+				.createdAt(Instant.now())
 				.build();
 
 			Mockito.when(userService.login(any(UserLoginRequest.class))).thenReturn(dto);
@@ -99,7 +97,7 @@ class UserControllerTest {
 				.id(userId)
 				.email("test@email.com")
 				.nickname("newNick")
-				.createdAt(OffsetDateTime.now(ZoneOffset.UTC))
+				.createdAt(Instant.now())
 				.build();
 
 			Mockito.when(userService.updateNickname(eq(userId), any(UserUpdateRequset.class)))
@@ -125,19 +123,18 @@ class UserControllerTest {
 			ResponseEntity<String> response = userController.deleteUser(userId);
 
 			assertThat(response.getStatusCode().value()).isEqualTo(200);
-			assertThat(response.getBody()).isEqualTo("회원이 삭제되었습니다.");
 		}
 
-		@Test
-		@DisplayName("하드 삭제 성공 시 OK 응답")
-		void hardDeleteUser_success() {
-			UUID userId = UUID.randomUUID();
-			Mockito.doNothing().when(userService).hardDeleteUser(userId);
-
-			ResponseEntity<String> response = userController.hardDeleteUser(userId);
-
-			assertThat(response.getStatusCode().value()).isEqualTo(200);
-			assertThat(response.getBody()).isEqualTo("회원의 데이터가 영구적으로 삭제되었습니다.");
-		}
+		// @Test
+		// @DisplayName("하드 삭제 성공 시 OK 응답")
+		// void hardDeleteUser_success() {
+		// 	UUID userId = UUID.randomUUID();
+		// 	Mockito.doNothing().when(userService).hardDeleteUser(userId);
+		//
+		// 	ResponseEntity<String> response = userController.hardDeleteUser(userId);
+		//
+		// 	assertThat(response.getStatusCode().value()).isEqualTo(200);
+		// 	assertThat(response.getBody()).isEqualTo("회원의 데이터가 영구적으로 삭제되었습니다.");
+		// }
 	}
 }

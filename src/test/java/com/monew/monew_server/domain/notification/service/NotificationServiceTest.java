@@ -4,19 +4,6 @@ import static org.assertj.core.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.BDDMockito.*;
 
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
-
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.DisplayName;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-
 import com.monew.monew_server.domain.article.entity.Article;
 import com.monew.monew_server.domain.article.entity.ArticleSource;
 import com.monew.monew_server.domain.comment.entity.Comment;
@@ -29,6 +16,17 @@ import com.monew.monew_server.domain.notification.repository.NotificationReposit
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
 import com.monew.monew_server.exception.NotificationNotFoundException;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("NotificationService 테스트")
@@ -191,7 +189,7 @@ class NotificationServiceTest {
 		// When & Then
 		assertThatThrownBy(() -> notificationService.confirm(notificationId, userId))
 			.isInstanceOf(NotificationNotFoundException.class)
-			.hasMessage("NOTIFICATION_NOT_FOUND");
+			.hasMessage("알림을 찾을 수 없습니다.");
 		verify(notificationRepository).findByIdAndUserId(notificationId, userId);
 	}
 

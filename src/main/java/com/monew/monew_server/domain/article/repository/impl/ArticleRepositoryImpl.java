@@ -128,7 +128,14 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 		if (request.sourceIn() != null && !request.sourceIn().isEmpty()) {
 			List<ArticleSource> validSources = request.sourceIn().stream()
 				.map(String::toUpperCase)
-				.filter(ArticleSource::isValid)
+				.filter(name -> {
+					try {
+						ArticleSource.valueOf(name);
+						return true;
+					} catch (IllegalArgumentException e) {
+						return false;
+					}
+				})
 				.map(ArticleSource::valueOf)
 				.toList();
 
@@ -154,7 +161,6 @@ public class ArticleRepositoryImpl implements ArticleRepositoryCustom {
 	}
 
 	private BooleanExpression whereCursor(ArticleRequest request, ArticleSortType orderBy, String direction) {
-		// cursor와 after 둘 다 있어야 커서 페이지네이션 적용
 		if (request.cursor() == null || request.cursor().isBlank() || request.after() == null) {
 			return null;
 		}

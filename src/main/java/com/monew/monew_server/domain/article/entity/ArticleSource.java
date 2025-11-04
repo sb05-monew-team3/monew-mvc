@@ -11,9 +11,9 @@ public enum ArticleSource {
 	CHOSUN,
 	YEONHAP;
 
-	public static boolean isValid(String s) {
+	public static boolean isValid(String name) {
 		try {
-			valueOf(s);
+			valueOf(name.toUpperCase());
 			return true;
 		} catch (IllegalArgumentException e) {
 			return false;

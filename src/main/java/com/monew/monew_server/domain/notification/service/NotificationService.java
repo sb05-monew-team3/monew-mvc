@@ -32,19 +32,20 @@ public class NotificationService {
 
 	@Transactional
 	public void createCommentLikeNotification(Comment comment, UUID likedByUserId) {
-		log.debug("알림(댓글 좋아요) 생성 시작: commentId={}, likedBy={}", comment.getId(), likedByUserId);
+		log.info("알림(댓글 좋아요) 생성 시작: commentId={}, likedBy={}", comment.getId(), likedByUserId);
 
 		if (comment.getUser().getId().equals(likedByUserId)) {
 			log.debug("자기 댓글 좋아요: commentId={}, userId={}", comment.getId(), likedByUserId);
 			return;
 		}
 
+
 		User likedByUser = userRepository.getReferenceById(likedByUserId);
 
 		Notification notification = Notification.builder()
 			.user(comment.getUser())
 			.content(String.format("%s님이 나의 댓글을 좋아합니다.", likedByUser.getNickname()))
-			.resourceType(NotificationResourceType.COMMENT)
+			.resourceType(NotificationResourceType.comment)
 			.resourceId(comment.getId())
 			.confirmed(false)
 			.build();

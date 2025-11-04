@@ -6,8 +6,6 @@ import lombok.RequiredArgsConstructor;
 @Getter
 @RequiredArgsConstructor
 public enum NotificationResourceType {
-	INTEREST("interest"),
-	COMMENT("comment");
-
-	private final String value;
+	interest,
+	comment;
 }

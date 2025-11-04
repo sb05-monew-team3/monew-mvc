@@ -3,8 +3,8 @@ package com.monew.monew_server.domain.article.entity;
 import java.time.Instant;
 import java.util.List;
 
-import org.hibernate.annotations.JdbcTypeCode;
-import org.hibernate.type.SqlTypes;
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
@@ -40,10 +40,9 @@ import lombok.experimental.SuperBuilder;
 @AllArgsConstructor(access = AccessLevel.PROTECTED)
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Article extends BaseDeletableEntity {
-
 	@Enumerated(EnumType.STRING)
-	@JdbcTypeCode(SqlTypes.VARCHAR)
 	@Column(name = "source", nullable = false)
+	@JdbcType(PostgreSQLEnumJdbcType.class)
 	private ArticleSource source;
 
 	@Column(columnDefinition = "text", nullable = false)

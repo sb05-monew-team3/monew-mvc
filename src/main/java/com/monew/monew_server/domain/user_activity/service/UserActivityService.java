@@ -40,10 +40,14 @@ public class UserActivityService {
 	/**
 	 * 사용자 전체 활동 조회
 	 */
+
 	@Transactional(readOnly = true)
 	public UserActivityDto getUserActivity(UUID userId) {
 		log.info("[UserActivityService] 사용자 활동 조회 요청 - userId={}", userId);
-		User user = userRepository.findById(userId)
+
+    User user =
+        userRepository
+            .findById(userId)
             .orElseThrow(() -> new UserActivityException(ErrorCode.USER_NOT_FOUND));
 
 		// 구독 중인 관심사 10개 조회
@@ -102,6 +106,7 @@ public class UserActivityService {
 			.map(cl -> {
 				UUID commentId = cl.getComment().getId();
 
+
 				long likeCount = userActivityCommentLikeRepository.countByComment_Id(commentId);
 
 				return CommentLikeSummaryDto.builder()
@@ -138,14 +143,15 @@ public class UserActivityService {
 					.source(article.getSource().name())
 					.sourceUrl(article.getSourceUrl())
 					.articleTitle(article.getTitle())
-					.articlePublishedDate(article.getPublishDate())
+					.articlePublishDate(article.getPublishDate())
 					.articleSummary(article.getSummary())
 					.articleCommentCount(commentCount)
 					.articleViewCount(viewCount)
 					.build();
-			})
-			.toList();
+				})
+				.toList();
 		log.debug("[UserActivityService] 기사 조회 {}건 완료", articleViews.size());
+
 
 		UserActivityDto result = userActivityMapper.toDto(
 			user,

@@ -87,20 +87,4 @@ public class GlobalExceptionHandler {
 		);
 		return new ErrorResponse(exception, HttpStatus.BAD_REQUEST.value());
 	}
-
-	@ExceptionHandler(NotFoundException.class)
-	@ResponseStatus(HttpStatus.NOT_FOUND)
-	public ErrorResponse handleNotFound(
-		NotFoundException exception,
-		HttpServletRequest request
-	) {
-		log.warn(
-			"Entity not found [404]: {} (Request: {} {})",
-			exception.getMessage(),
-			request.getMethod(),
-			request.getRequestURI()
-		);
-
-		return new ErrorResponse(exception, HttpStatus.NOT_FOUND.value());
-	}
 }

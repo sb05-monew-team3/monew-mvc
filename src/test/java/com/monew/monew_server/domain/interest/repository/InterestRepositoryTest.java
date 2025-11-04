@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.*;
 
 import com.monew.monew_server.domain.interest.entity.Interest;
 import com.monew.monew_server.exception.ErrorCode;
-import com.monew.monew_server.exception.NotFoundException;
+import com.monew.monew_server.exception.InterestException;
 import jakarta.persistence.EntityManager;
 import java.util.List;
 import java.util.UUID;
@@ -99,7 +99,7 @@ class InterestRepositoryTest {
 
         // when & then
         // 2. 예외가 발생하는지 검증
-        NotFoundException exception = assertThrows(NotFoundException.class, () -> interestRepository.getOrThrow(nonExistentId));
+        InterestException exception = assertThrows(InterestException.class, () -> interestRepository.getOrThrow(nonExistentId));
 
         // 3. 예외의 상세 내용(ErrorCode, Message) 검증
         assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INTEREST_NOT_FOUND);

@@ -8,4 +8,8 @@ public class InterestException extends BaseException {
         super(errorCode);
         details.forEach(this::addDetail);
     }
+
+    public InterestException(ErrorCode errorCode) {
+        this(errorCode, Map.of());
+    }
 }

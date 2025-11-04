@@ -15,7 +15,6 @@ import com.monew.monew_server.domain.user_activity.dto.CommentLikeSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.CommentSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.SubscriptionSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
-import com.monew.monew_server.domain.user_activity.dto.UserInfoDto;
 import com.monew.monew_server.domain.user_activity.mapper.UserActivityMapper;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityArticleViewRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentLikeRepository;
@@ -23,6 +22,9 @@ import com.monew.monew_server.domain.user_activity.repository.UserActivityCommen
 import com.monew.monew_server.domain.user_activity.repository.UserActivityInterestKeywordRepository;
 import com.monew.monew_server.domain.user_activity.repository.UserActivitySubscriptionRepository;
 import com.monew.monew_server.exception.ErrorCode;
+import com.monew.monew_server.exception.UserActivityException;
+import java.util.List;
+import java.util.UUID;
 import com.monew.monew_server.exception.NotFoundException;
 
 import lombok.RequiredArgsConstructor;
@@ -68,6 +70,10 @@ public class UserActivityService {
 	public UserActivityDto getUserActivity(UUID userId) {
 		log.info("[UserActivityService] 사용자 활동 조회 요청 - userId={}", userId);
 
+    User user =
+        userRepository
+            .findById(userId)
+            .orElseThrow(() -> new UserActivityException(ErrorCode.USER_NOT_FOUND));
 		User user = userRepository.findById(userId)
 			.orElseThrow(() -> {
 				log.warn("[UserActivityService] 존재하지 않는 사용자 ID 요청 - userId={}", userId);

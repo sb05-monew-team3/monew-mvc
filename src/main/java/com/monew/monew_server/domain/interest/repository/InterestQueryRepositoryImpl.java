@@ -75,7 +75,7 @@ public class InterestQueryRepositoryImpl implements InterestQueryRepository {
                 buildRangeFromCursor(query.sortField(), query.desc(), query.cursor(), query.after())
             )
             .orderBy(buildOrderSpecifiers(query.sortField(), query.desc()))
-            .limit(query.limit() + 1)
+            .limit(query.limit() + 1L)
             .fetch();
 
         boolean hasNext = tempRows.size() > query.limit();

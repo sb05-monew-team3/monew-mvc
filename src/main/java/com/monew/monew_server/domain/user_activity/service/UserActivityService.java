@@ -1,8 +1,5 @@
 package com.monew.monew_server.domain.user_activity.service;
 
-import java.time.ZoneOffset;
-import java.time.format.DateTimeFormatter;
-import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.UUID;
 
@@ -43,7 +40,6 @@ public class UserActivityService {
 	private final UserActivityCommentLikeRepository userActivityCommentLikeRepository;
 	private final UserActivityArticleViewRepository userActivityArticleViewRepository;
 	private final UserActivityInterestKeywordRepository userActivityInterestKeywordRepository;
-
 
 	/*
 	 * 사용자 기본 정보 조회
@@ -134,7 +130,6 @@ public class UserActivityService {
 			.map(cl -> {
 				UUID commentId = cl.getComment().getId();
 
-
 				long likeCount = userActivityCommentLikeRepository.countByComment_Id(commentId);
 
 				return CommentLikeSummaryDto.builder()
@@ -171,15 +166,14 @@ public class UserActivityService {
 					.source(article.getSource().name())
 					.sourceUrl(article.getSourceUrl())
 					.articleTitle(article.getTitle())
-					.articlePublishDate(article.getPublishDate())
+					.articlePublishedDate(article.getPublishDate())
 					.articleSummary(article.getSummary())
 					.articleCommentCount(commentCount)
 					.articleViewCount(viewCount)
 					.build();
-				})
-				.toList();
+			})
+			.toList();
 		log.debug("[UserActivityService] 기사 조회 {}건 완료", articleViews.size());
-
 
 		UserActivityDto result = userActivityMapper.toDto(
 			user,

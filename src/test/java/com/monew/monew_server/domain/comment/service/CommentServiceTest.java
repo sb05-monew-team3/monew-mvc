@@ -36,7 +36,6 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 class CommentServiceTest {
 
     @Container
-    @SuppressWarnings("resource")
     static PostgreSQLContainer<?> postgreSQLContainer = new PostgreSQLContainer<>("postgres:15-alpine");
 
     @DynamicPropertySource
@@ -118,17 +117,17 @@ class CommentServiceTest {
     @DisplayName("getComments - 댓글 목록 조회 성공 (커서 페이징)")
     void getComments_Success() {
         // given: 댓글 3개 생성
-        Comment comment1 = commentRepository.save(Comment.builder()
+        commentRepository.save(Comment.builder()
             .article(article1)
             .user(user1)
             .content("첫 번째 댓글")
             .build());
-        Comment comment2 = commentRepository.save(Comment.builder()
+        commentRepository.save(Comment.builder()
             .article(article1)
             .user(user2)
             .content("두 번째 댓글")
             .build());
-        Comment comment3 = commentRepository.save(Comment.builder()
+        commentRepository.save(Comment.builder()
             .article(article1)
             .user(user1)
             .content("세 번째 댓글")
@@ -312,7 +311,7 @@ class CommentServiceTest {
         entityManager.clear();
 
         // when
-        commentService.hardDeleteComment(commentId, user1.getId());
+        commentService.hardDeleteComment(commentId);
         entityManager.flush();
         entityManager.clear();
 
@@ -328,28 +327,9 @@ class CommentServiceTest {
 
         // when & then
         EntityNotFoundException exception = assertThrows(EntityNotFoundException.class,
-            () -> commentService.hardDeleteComment(fakeCommentId, user1.getId())
+            () -> commentService.hardDeleteComment(fakeCommentId)
         );
 
         assertThat(exception.getMessage()).contains("댓글을 찾을 수 없습니다");
-    }
-
-    @Test
-    @DisplayName("hardDeleteComment - 작성자가 아닌 사용자가 삭제 시도 시 예외 발생")
-    void hardDeleteComment_ThrowsException_WhenUserIsNotOwner() {
-        // given
-        Comment comment = commentRepository.save(Comment.builder()
-            .article(article1)
-            .user(user1)
-            .content("댓글")
-            .build());
-        entityManager.flush();
-
-        // when & then: user2가 삭제 시도
-        IllegalArgumentException exception = assertThrows(IllegalArgumentException.class,
-            () -> commentService.hardDeleteComment(comment.getId(), user2.getId())
-        );
-
-        assertThat(exception.getMessage()).contains("본인이 작성한 댓글만 삭제할 수 있습니다");
     }
 }

@@ -86,8 +86,8 @@ jobs:
         run: |
           # create-deployment의 JSON 출력을 DEPLOYMENT_OUTPUT_JSON 파일에 저장
           aws deploy create-deployment \
-            --application-name ${{ secrets.CODEDEPY_APP_NAME }} \
-            --deployment-group-name ${{ secrets.CODEDEPY_DEPLOYMENT_GROUP_NAME }} \
+            --application-name ${{ secrets.CODEDEPLOY_APP_NAME }} \
+            --deployment-group-name ${{ secrets.CODEDEPLOY_DEPLOYMENT_GROUP_NAME }} \
             --deployment-config-name CodeDeployDefault.OneAtATime \
             --description "Deployment from GitHub Actions ${{ github.sha }}" \
             --s3-location bucket=$S3_BUCKET,key=$S3_KEY,bundleType=zip \

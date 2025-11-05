@@ -8,7 +8,7 @@ PostgreSQL과 MongoDB 기반으로 데이터를 안전하게 저장하고, Sprin
 ## ⚙️기술스택
 `Java 17` `Spring Boot 3.5.6` `MapStruct` `JPA + QueryDSL` `PostgreSQL` `MongoDB` `AWS ECS` `AWS RDS` `AWS S3`  
 
-## 디렉토리 구조(예시)
+## 디렉토리 구조
 ```plaintext
 monew-mvc/
  ┣ src/main/java/com/monew/monew_server/

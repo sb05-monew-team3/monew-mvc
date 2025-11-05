@@ -29,7 +29,7 @@ spring:
 
   data:
     mongodb:
-      uri: mongodb://mongo:asdf1234!@monew-cluster-182498323365.ap-northeast-2.docdb-elastic.amazonaws.com:27017/?tls=true&authMechanism=SCRAM-SHA-1&retryWrites=false
+      uri: mongodb://mongo:asdf1234!@monew-cluster-182498323365.ap-northeast-2.docdb-elastic.amazonaws.com:27017/monew?tls=true&authMechanism=SCRAM-SHA-1&retryWrites=false
 
   jpa:
     hibernate:

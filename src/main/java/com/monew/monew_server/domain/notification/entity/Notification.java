@@ -2,6 +2,9 @@ package com.monew.monew_server.domain.notification.entity;
 
 import java.util.UUID;
 
+import org.hibernate.annotations.JdbcType;
+import org.hibernate.dialect.PostgreSQLEnumJdbcType;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.common.BaseUpdatableEntity;
 import com.monew.monew_server.domain.user.entity.User;
@@ -40,6 +43,7 @@ public class Notification extends BaseUpdatableEntity {
 	private String content;
 
 	@Enumerated(EnumType.STRING)
+	@JdbcType(PostgreSQLEnumJdbcType.class)
 	private NotificationResourceType resourceType;
 
 	private UUID resourceId;

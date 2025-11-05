@@ -14,8 +14,8 @@ public interface ArticleRepository extends JpaRepository<Article, UUID>, Article
 	@Modifying
 	@Query(value = """
 		INSERT INTO articles (id, source, source_url, title, summary, publish_date, created_at, updated_at)
-			VALUES (:id, CAST(:source AS source), :sourceUrl, :title, :summary, :publishDate, now(), NULL)
-			ON CONFLICT (id) DO NOTHING
+		   VALUES (:id, CAST(:source AS source), :sourceUrl, :title, :summary, :publishDate, now(), NULL)
+		   ON CONFLICT ON CONSTRAINT uk_articles_source_source_url DO NOTHING
 		""", nativeQuery = true)
 	int insertIfNotExists(
 		@Param("id") UUID id,

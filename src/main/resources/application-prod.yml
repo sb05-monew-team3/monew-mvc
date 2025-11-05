@@ -11,7 +11,7 @@ spring:
   boot:
     admin:
       client:
-        enabled: true
+        enabled: false
         url: ${SPRING_BOOT_ADMIN_URL:http://localhost:9090}
         instance:
           name: monew_server

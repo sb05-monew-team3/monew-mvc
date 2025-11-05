@@ -2,7 +2,7 @@
 
 APP_DIR="/home/ubuntu/app/monew-server"
 CONTAINER_NAME="monew-server"
-IMAGE_URI_FILE="$APP_DIR/image_uri.txt"
+IMAGE_URI_FILE="$APP_DIR/image_uri.txt" # <--- 이 파일을 읽을 것입니다.
 
 AWS_REGION=$(curl -s http://169.254.169.254/latest/dynamic/instance-identity/document | jq -r .region)
 ECR_HOST=$(aws ecr get-authorization-token --region $AWS_REGION --output text --query 'authorizationData[0].proxyEndpoint')

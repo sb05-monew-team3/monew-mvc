@@ -1,4 +1,4 @@
-package com.monew.monew_server.domain.user_activity.repository;
+package com.monew.monew_server.domain.user_activity.repository.jpa;
 
 import java.util.List;
 import java.util.UUID;
@@ -12,3 +12,4 @@ import com.monew.monew_server.domain.interest.entity.InterestKeyword;
 public interface UserActivityInterestKeywordRepository extends JpaRepository<InterestKeyword, UUID> {
 	List<InterestKeyword> findByInterest_Id(UUID interestId);
 }
+

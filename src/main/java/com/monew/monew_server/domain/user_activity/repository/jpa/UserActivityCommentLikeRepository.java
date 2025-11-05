@@ -1,4 +1,4 @@
-package com.monew.monew_server.domain.user_activity.repository;
+package com.monew.monew_server.domain.user_activity.repository.jpa;
 
 import java.util.List;
 import java.util.UUID;

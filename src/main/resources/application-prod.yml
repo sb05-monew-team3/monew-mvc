@@ -22,7 +22,7 @@ spring:
           management-base-url: ${MANAGEMENT_PUBLIC_URL:http://localhost:8081}
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://${DB_PROD_HOST}:${DB_PROD_PORT}/${DB_PROD_NAME}
+    url: jdbc:postgresql://${DB_PROD_HOST}/${DB_PROD_NAME}
     username: ${DB_PROD_USER}
     password: ${DB_PROD_PASSWORD}
 

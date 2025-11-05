@@ -37,7 +37,7 @@ public class S3BinaryStorage {
 		String dateString = date.format(DateTimeFormatter.ofPattern("yyyy-MM-dd"));
 		String prefix = String.format("article/%s/%s/", interest, dateString);
 
-		log.info("S3 백업 파일 목록 요청: {}/{}", bucketName, prefix);
+		log.debug("S3 백업 파일 목록 요청: {}/{}", bucketName, prefix);
 
 		ObjectMapper objectMapper = new ObjectMapper();
 		objectMapper.registerModule(new JavaTimeModule());
@@ -65,7 +65,7 @@ public class S3BinaryStorage {
 					continue;
 				}
 
-				log.info("-> UUID 파일 로드: {}", obj.key());
+				log.debug("-> UUID 파일 로드: {}", obj.key());
 				GetObjectRequest getRequest = GetObjectRequest.builder()
 					.bucket(bucketName)
 					.key(obj.key())

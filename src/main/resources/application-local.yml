@@ -14,7 +14,7 @@ spring:
   app:
     aws:
       s3:
-        bucket-name: ${AWS_S3_BUCKET}
+        bucket-name: monew-prod-bucket
 
   datasource:
     driver-class-name: org.postgresql.Driver

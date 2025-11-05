@@ -5,8 +5,6 @@ COPY build.gradle settings.gradle /build/
 COPY gradlew /build/
 COPY gradle /build/gradle
 
-COPY .env /build/
-
 RUN ./gradlew dependencies
 
 COPY src /build/src

@@ -14,6 +14,11 @@ spring:
       - "optional:classpath:application-prod.yml" # 프로덕션용
       - "optional:aws-secretsmanager:${sm.secret.name:}"
 
+  data:
+    jpa:
+      repositories:
+        enabled: true
+
 management:
   server:
     port: 8081
@@ -36,19 +41,12 @@ management:
     build:
       enabled: true
 
-
 springdoc:
   api-docs:
     enabled: true
     path: /api-docs
-
   swagger-ui:
     enabled: true
     path: /swagger-ui.html
     display-request-duration: true
     persist-authorization: true
-
-  sql:
-    init:
-      encoding: UTF-8
-

@@ -26,7 +26,7 @@ jobs:
 
       # 4. Gradle 빌드 (Docker 이미지 빌드를 위해 .jar 파일 생성)
       - name: Build with Gradle
-        run: ./gradlew clean build -x test # 테스트 제외하고 빌드 (CI에서 테스트는 별도 단계 권장)
+        run: ./gradlew clean build -x test
 
       # 5. AWS 자격 증명 설정
       - name: Configure AWS Credentials
@@ -40,18 +40,17 @@ jobs:
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
-        with:
-          registry: ${{ secrets.ECR_REPOSITORY_URI }} # ECR URI의 호스트 부분만 추출
 
-      # 7. Docker 이미지 빌드 및 태그 (GitHub SHA 기준)
+      # 7. Docker 이미지 빌드 및 태그
       - name: Build and tag Docker image
         id: build-image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPO_URI: ${{ secrets.ECR_REPOSITORY_URI }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          docker build -t $ECR_REGISTRY:$IMAGE_TAG .
-          echo "image_uri=$ECR_REGISTRY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          # ECR_REPO_URI 전체를 이미지 이름으로 사용합니다. (예: .../monew-server:8713...)
+          docker build -t $ECR_REPO_URI:$IMAGE_TAG .
+          echo "image_uri=$ECR_REPO_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
       # 8. Docker 이미지를 ECR에 푸시
       - name: Push Docker image to ECR

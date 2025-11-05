@@ -5,12 +5,6 @@ PostgreSQL과 MongoDB 기반으로 데이터를 안전하게 저장하고, Sprin
 ## ✨개요
 사용자 및 뉴스 관련 핵심 도메인을 관리하는 Monew의 메인 서버로 REST 기반 서비스 로직을 제공하며 Batch 및 Actuator 모듈과 연동됩니다. 
 
-## ✅주요 기능
-- 사용자 CRUD 및 활동 내역 조회
-- 뉴스 기사 등록·조회, 댓글/좋아요 관리
-- 관심사 및 알림 기능 통합
-- MongoDB 기반 사용자 활동 로그 저장
-
 ## ⚙️기술스택
 `Java 17` `Spring Boot 3.5.6` `MapStruct` `JPA + QueryDSL` `PostgreSQL` `MongoDB` `AWS ECS` `AWS RDS` `AWS S3`  
 

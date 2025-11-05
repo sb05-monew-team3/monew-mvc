@@ -1,16 +1,19 @@
 package com.monew.monew_server.domain.article.entity;
 
+import java.time.Instant;
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
+
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
-import java.time.Instant;
-import java.util.List;
 import lombok.AccessLevel;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
@@ -37,6 +40,7 @@ public class Article extends BaseDeletableEntity {
 
 	private String title;
 
+	@Column(name = "summary", columnDefinition = "TEXT")
 	private String summary;
 
 	private Instant publishDate;

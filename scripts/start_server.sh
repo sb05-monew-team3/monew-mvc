@@ -40,6 +40,9 @@ docker run -d \
   --name ${CONTAINER_NAME} \
   -p 8080:8080 \
   -e "SPRING_PROFILES_ACTIVE=prod" \
+  --network host \
+  -v /home/ubuntu/.aws:/root/.aws \
+  -e AWS_REGION=${AWS_REGION} \
   ${ECR_IMAGE_URI}
 
 echo "배포 완료"

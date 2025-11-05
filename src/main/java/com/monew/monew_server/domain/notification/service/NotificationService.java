@@ -1,5 +1,12 @@
 package com.monew.monew_server.domain.notification.service;
 
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.monew.monew_server.domain.comment.entity.Comment;
 import com.monew.monew_server.domain.notification.dto.CursorPageResponse;
 import com.monew.monew_server.domain.notification.dto.NotificationDto;
@@ -10,13 +17,9 @@ import com.monew.monew_server.domain.notification.repository.NotificationReposit
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
 import com.monew.monew_server.exception.NotificationNotFoundException;
-import java.time.Instant;
-import java.util.List;
-import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -35,7 +38,6 @@ public class NotificationService {
 			log.debug("자기 댓글 좋아요: commentId={}, userId={}", comment.getId(), likedByUserId);
 			return;
 		}
-
 
 		User likedByUser = userRepository.getReferenceById(likedByUserId);
 

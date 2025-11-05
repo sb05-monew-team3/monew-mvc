@@ -1,5 +1,15 @@
 package com.monew.monew_server.domain.article.service;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
 import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
@@ -20,40 +30,32 @@ import com.monew.monew_server.domain.article.storage.S3BinaryStorage;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
 import com.monew.monew_server.domain.interest.entity.Interest;
-import com.monew.monew_server.domain.interest.entity.InterestKeyword;
-import com.monew.monew_server.domain.interest.repository.InterestKeywordRepository;
 import com.monew.monew_server.domain.interest.repository.InterestRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.exception.ArticleException;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
 public class ArticleService {
 
+	private static final int DEFAULT_PAGE_SIZE = 10;
 	private final ArticleRepository articleRepository;
 	private final ArticleRepositoryCustom articleRepositoryCustom;
 	private final ArticleMapper articleMapper;
 	private final ArticleViewRepository articleViewRepository;
 	private final CommentRepository commentRepository;
 	private final S3BinaryStorage s3BinaryStorage;
+
 	private final InterestRepository interestRepository;
 	private final ArticleInterestRepository articleInterestRepository;
-	private final InterestKeywordRepository interestKeywordRepository;
+
+	@PersistenceContext
+	private EntityManager entityManager;
 
 	public ArticleService(
 		ArticleRepository articleRepository,
@@ -61,8 +63,8 @@ public class ArticleService {
 		ArticleMapper articleMapper,
 		ArticleViewRepository articleViewRepository,
 		CommentRepository commentRepository, S3BinaryStorage s3BinaryStorage,
-		InterestRepository interestRepository, ArticleInterestRepository articleInterestRepository,
-		InterestKeywordRepository interestKeywordRepository
+		InterestRepository interestRepository,
+		ArticleInterestRepository articleInterestRepository
 	) {
 		this.articleRepository = articleRepository;
 		this.articleRepositoryCustom = articleRepositoryCustom;
@@ -72,12 +74,7 @@ public class ArticleService {
 		this.s3BinaryStorage = s3BinaryStorage;
 		this.interestRepository = interestRepository;
 		this.articleInterestRepository = articleInterestRepository;
-		this.interestKeywordRepository = interestKeywordRepository;
 	}
-
-	private static final int DEFAULT_PAGE_SIZE = 10;
-	@PersistenceContext
-	private EntityManager entityManager;
 
 	public CursorPageResponseArticleDto fetchArticles(ArticleRequest request, UUID currentUserId) {
 
@@ -98,7 +95,7 @@ public class ArticleService {
 
 		var commentCounts = commentRepository.findCommentCountsByArticleIds(articleIds)
 			.stream().collect(Collectors.toMap(CommentCountProjection::getArticleId,
-                CommentCountProjection::getCommentCount));
+				CommentCountProjection::getCommentCount));
 
 		List<ArticleResponse> enrichedResponses = allResponses.stream().map(resp ->
 			new ArticleResponse(
@@ -234,121 +231,73 @@ public class ArticleService {
 	@Transactional
 	public List<ArticleRestoreResult> restoreArticles(LocalDateTime from, LocalDateTime to) {
 		List<ArticleRestoreResult> results = new ArrayList<>();
+		List<String> interestNames = getInterestName();
 		LocalDateTime current = from;
 
-		List<Interest> allInterests = interestRepository.findAll();
-
-		if (allInterests.isEmpty()) {
-			log.warn("DB에 등록된 관심사(Interest)가 없어 기사-관심사 연결을 건너뜁니다.");
-		}
-
-		List<UUID> interestIds = allInterests.stream()
-			.map(Interest::getId)
-			.toList();
-
-		List<InterestKeyword> allKeywords = interestKeywordRepository.findByInterestIdIn(interestIds);
-
-		Map<UUID, List<InterestKeyword>> keywordsByInterestId = allKeywords.stream()
-			.collect(Collectors.groupingBy(k -> k.getInterest().getId()));
-
 		while (!current.isAfter(to)) {
-			try {
-				List<ArticleSaveDto> backupArticles = s3BinaryStorage.getBackupArticles(current);
+			List<UUID> restoredArticleIds = new ArrayList<>();
+
+			for (String interestName : interestNames) {
+				log.info("게시글 복원 시작 - 관심사: {}, 날짜: {}", interestName, current);
+
+				List<ArticleSaveDto> backupArticles = s3BinaryStorage.getBackupArticles(interestName, current);
 
 				if (backupArticles.isEmpty()) {
-					log.warn("{} 날짜 백업 파일이 없습니다.",
-						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-					current = current.plusDays(1);
+					log.info("복원할 게시글 없음 - 관심사: {}, 날짜: {}", interestName, current);
 					continue;
 				}
 
-				log.info("{} 날짜 백업 파일 {}건 로드 완료",
-					current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
-					backupArticles.size());
-
-				List<ArticleSource> backupSources = backupArticles.stream()
-					.map(ArticleSaveDto::getSource)
-					.distinct()
-					.toList();
-
-				List<String> backupSourceUrls = backupArticles.stream()
-					.map(ArticleSaveDto::getSourceUrl)
-					.toList();
-
-				List<Article> existingArticles = articleRepository
-					.findBySourceInAndSourceUrlIn(backupSources, backupSourceUrls);
-
-				Set<String> existingLinks = existingArticles.stream()
-					.map(Article::getOriginalLink)
-					.collect(Collectors.toSet());
-
-				List<Article> newArticles = backupArticles.stream()
-					.filter(dto -> !existingLinks.contains(dto.getOriginalLink()))
-					.map(Article::fromDto)
-					.collect(Collectors.toList());
-
-				if (!newArticles.isEmpty()) {
-					articleRepository.saveAll(newArticles);
-
-					List<ArticleInterest> articleInterestsToSave = new ArrayList<>();
-
-					if (!allInterests.isEmpty()) {
-						for (Article article : newArticles) {
-							String titleLower = article.getTitle() != null
-								? article.getTitle().toLowerCase()
-								: "";
-							String summaryLower = article.getSummary() != null
-								? article.getSummary().toLowerCase()
-								: "";
-							String contentToMatch = titleLower + " " + summaryLower;
-
-							for (Interest interest : allInterests) {
-								List<InterestKeyword> keywords = keywordsByInterestId
-									.getOrDefault(interest.getId(), List.of());
-
-								boolean hasMatchingKeyword = keywords.stream()
-									.anyMatch(keyword -> {
-										String keywordLower = keyword.getName().toLowerCase();
-										return contentToMatch.contains(keywordLower);
-									});
-
-								if (hasMatchingKeyword) {
-									ArticleInterest articleInterest = ArticleInterest.of(article, interest);
-									articleInterestsToSave.add(articleInterest);
-									log.debug("기사 '{}' 와 관심사 '{}' 연결",
-										article.getTitle(), interest.getName());
-								}
-							}
-						}
-
-						if (!articleInterestsToSave.isEmpty()) {
-							articleInterestRepository.saveAll(articleInterestsToSave);
-						}
+				for (ArticleSaveDto articleSaveDto : backupArticles) {
+					if (articleRepository.existsById(articleSaveDto.getId())) {
+						log.info("이미 존재하는 게시글 건너뛰기: {}", articleSaveDto.getId());
+						continue;
 					}
 
-					results.add(new ArticleRestoreResult(
-						LocalDateTime.now(),
-						newArticles.stream().map(Article::getId).toList(),
-						newArticles.size()
-					));
-
-					log.info("{} 날짜 복구 완료 (총 {}건 중 {}건 신규 저장, {}개 관심사 연결)",
-						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")),
-						backupArticles.size(),
-						newArticles.size(),
-						articleInterestsToSave.size()
+					articleRepository.insertIfNotExists(
+						articleSaveDto.getId(),
+						articleSaveDto.getSource().name(),
+						articleSaveDto.getSourceUrl(),
+						articleSaveDto.getTitle(),
+						articleSaveDto.getSummary(),
+						articleSaveDto.getPublishDate()
 					);
-				} else {
-					log.info("{} 날짜 모든 기사가 이미 존재합니다.",
-						current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")));
-				}
 
-			} catch (Exception e) {
-				log.error("{} 날짜 복구 중 오류 발생",
-					current.format(DateTimeFormatter.ofPattern("yyyy-MM-dd")), e);
+					Article article = articleRepository.findById(articleSaveDto.getId()).orElseThrow();
+					List<Interest> interests = interestRepository.findByName(interestName);
+
+					for (Interest interest : interests) {
+						ArticleInterest articleInterest = ArticleInterest.of(article, interest);
+						articleInterestRepository.save(articleInterest);
+					}
+
+					restoredArticleIds.add(articleSaveDto.getId());
+				}
 			}
+			ArticleRestoreResult articleRestoreResult = ArticleRestoreResult.builder()
+				.restoredArticleCount(restoredArticleIds.size())
+				.restoredArticleIds(restoredArticleIds)
+				.restoreDate(current)
+				.build();
+			results.add(articleRestoreResult);
+
+			log.info("{} - 복원 - {}개 게시글 복원", articleRestoreResult.restoreDate(),
+				articleRestoreResult.restoredArticleCount());
+
 			current = current.plusDays(1);
 		}
+
+		log.info("전체 복원 완료 - 총 {}일 처리, 총 {}개 게시글 복원",
+			results.size(),
+			results.stream().mapToInt(ArticleRestoreResult::restoredArticleCount).sum());
+
 		return results;
+	}
+
+	private List<String> getInterestName() {
+		List<Interest> all = interestRepository.findAll();
+		if (all.isEmpty())
+			return List.of();
+
+		return all.stream().map(Interest::getName).toList();
 	}
 }

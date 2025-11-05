@@ -42,8 +42,6 @@ import com.monew.monew_server.domain.article.storage.S3BinaryStorage;
 import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
 import com.monew.monew_server.domain.interest.entity.Interest;
-import com.monew.monew_server.domain.interest.entity.InterestKeyword;
-import com.monew.monew_server.domain.interest.repository.InterestKeywordRepository;
 import com.monew.monew_server.domain.interest.repository.InterestRepository;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.exception.ArticleException;
@@ -54,6 +52,8 @@ import jakarta.persistence.EntityManager;
 @MockitoSettings(strictness = Strictness.LENIENT)
 class ArticleServiceTest {
 
+	private final UUID DUMMY_USER_ID = UUID.randomUUID();
+	private final UUID ARTICLE_ID = UUID.randomUUID();
 	@Mock
 	private ArticleRepository articleRepository;
 	@Mock
@@ -67,18 +67,12 @@ class ArticleServiceTest {
 	@Mock
 	private ArticleInterestRepository articleInterestRepository;
 	@Mock
-	private InterestKeywordRepository interestKeywordRepository;
-	@Mock
 	private CommentRepository commentRepository;
 	@Mock
 	private EntityManager entityManager;
 	@Mock
 	private S3BinaryStorage s3BinaryStorage;
-
 	private ArticleService articleService;
-
-	private final UUID DUMMY_USER_ID = UUID.randomUUID();
-	private final UUID ARTICLE_ID = UUID.randomUUID();
 
 	@BeforeEach
 	void setUp() {
@@ -90,8 +84,7 @@ class ArticleServiceTest {
 			commentRepository,
 			s3BinaryStorage,
 			interestRepository,
-			articleInterestRepository,
-			interestKeywordRepository
+			articleInterestRepository
 		);
 		try {
 			java.lang.reflect.Field entityManagerField = ArticleService.class.getDeclaredField("entityManager");
@@ -536,13 +529,13 @@ class ArticleServiceTest {
 
 		when(articleRepositoryCustom.findArticleById(ARTICLE_ID)).thenReturn(Optional.of(article));
 		when(articleViewRepository.existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID))
-			.thenReturn(false)
-			.thenReturn(true);
+			.thenReturn(false);
 		when(entityManager.getReference(User.class, DUMMY_USER_ID)).thenReturn(user);
 		when(articleViewRepository.countByArticleId(ARTICLE_ID)).thenReturn(1L);
 		when(commentRepository.countByArticleId(ARTICLE_ID)).thenReturn(0L);
-		when(articleMapper.toResponse(article, 1L, 0L, true)).thenReturn(
-			new ArticleResponse(ARTICLE_ID, ArticleSource.NAVER, "url", "Title", Instant.now(), "Summary", 0L, 1L, true)
+		when(articleMapper.toResponse(article, 1L, 0L, false)).thenReturn(
+			new ArticleResponse(ARTICLE_ID, ArticleSource.NAVER, "url", "Title", Instant.now(), "Summary", 0L, 1L,
+				false)
 		);
 
 		articleService.getArticleById(ARTICLE_ID, DUMMY_USER_ID);
@@ -857,32 +850,36 @@ class ArticleServiceTest {
 	}
 
 	@Test
+	@DisplayName("Service - restoreArticles 관심사가 없을 때")
+	void shouldSkipWhenNoInterests() {
+		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
+		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
+
+		when(interestRepository.findAll()).thenReturn(Collections.emptyList());
+
+		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
+
+		assertThat(results).hasSize(1);
+		assertThat(results.get(0).restoredArticleCount()).isEqualTo(0);
+		verify(s3BinaryStorage, never()).getBackupArticles(anyString(), any(LocalDateTime.class));
+	}
+
+	@Test
 	@DisplayName("Service - restoreArticles 백업 파일이 비어있을 때")
 	void shouldSkipWhenBackupArticlesEmpty() {
 		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
 		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
 
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(Collections.emptyList());
+		Interest interest = Interest.builder().id(UUID.randomUUID()).name("경제").build();
 
-		List<com.monew.monew_server.domain.article.dto.ArticleRestoreResult> results =
-			articleService.restoreArticles(from, to);
+		when(interestRepository.findAll()).thenReturn(List.of(interest));
+		when(s3BinaryStorage.getBackupArticles("경제", from)).thenReturn(Collections.emptyList());
 
-		assertThat(results).isEmpty();
-		verify(articleRepository, never()).saveAll(anyList());
-	}
+		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
 
-	@Test
-	@DisplayName("Service - restoreArticles 복구 중 예외 발생")
-	void shouldHandleExceptionDuringRestore() {
-		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
-		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
-
-		when(s3BinaryStorage.getBackupArticles(from)).thenThrow(new RuntimeException("S3 Error"));
-
-		List<com.monew.monew_server.domain.article.dto.ArticleRestoreResult> results =
-			articleService.restoreArticles(from, to);
-
-		assertThat(results).isEmpty();
+		assertThat(results).hasSize(1);
+		assertThat(results.get(0).restoredArticleCount()).isEqualTo(0);
+		verify(articleRepository, never()).insertIfNotExists(any(), any(), any(), any(), any(), any());
 	}
 
 	@Test
@@ -891,34 +888,27 @@ class ArticleServiceTest {
 		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
 		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
 
-		com.monew.monew_server.domain.article.dto.ArticleSaveDto dto1 =
-			com.monew.monew_server.domain.article.dto.ArticleSaveDto.builder()
-				.source(ArticleSource.NAVER)
-				.sourceUrl("http://test.com/1")
-				.title("Article 1")
-				.summary("Summary")
-				.publishDate(Instant.now())
-				.build();
+		Interest interest = Interest.builder().id(UUID.randomUUID()).name("경제").build();
+		UUID existingId = UUID.randomUUID();
 
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto1));
-
-		Article existingArticle = Article.builder()
-			.id(UUID.randomUUID())
+		ArticleSaveDto dto1 = ArticleSaveDto.builder()
+			.id(existingId)
 			.source(ArticleSource.NAVER)
 			.sourceUrl("http://test.com/1")
-			.title("Existing Article")
+			.title("Article 1")
 			.summary("Summary")
 			.publishDate(Instant.now())
 			.build();
 
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(List.of(existingArticle));
+		when(interestRepository.findAll()).thenReturn(List.of(interest));
+		when(s3BinaryStorage.getBackupArticles("경제", from)).thenReturn(List.of(dto1));
+		when(articleRepository.existsById(existingId)).thenReturn(true);
 
-		List<com.monew.monew_server.domain.article.dto.ArticleRestoreResult> results =
-			articleService.restoreArticles(from, to);
+		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
 
-		assertThat(results).isEmpty();
-		verify(articleRepository, never()).saveAll(anyList());
+		assertThat(results).hasSize(1);
+		assertThat(results.get(0).restoredArticleCount()).isEqualTo(0);
+		verify(articleRepository, never()).insertIfNotExists(any(), any(), any(), any(), any(), any());
 	}
 
 	@Test
@@ -927,25 +917,39 @@ class ArticleServiceTest {
 		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
 		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
 
-		com.monew.monew_server.domain.article.dto.ArticleSaveDto dto1 =
-			com.monew.monew_server.domain.article.dto.ArticleSaveDto.builder()
-				.source(ArticleSource.NAVER)
-				.sourceUrl("http://test.com/1")
-				.title("New Article")
-				.summary("Summary")
-				.publishDate(Instant.now())
-				.build();
+		Interest interest = Interest.builder().id(UUID.randomUUID()).name("경제").build();
+		UUID newId = UUID.randomUUID();
 
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto1));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
+		ArticleSaveDto dto1 = ArticleSaveDto.builder()
+			.id(newId)
+			.source(ArticleSource.NAVER)
+			.sourceUrl("http://test.com/1")
+			.title("New Article")
+			.summary("Summary")
+			.publishDate(Instant.now())
+			.build();
 
-		List<com.monew.monew_server.domain.article.dto.ArticleRestoreResult> results =
-			articleService.restoreArticles(from, to);
+		Article savedArticle = Article.builder().id(newId).build();
+
+		when(interestRepository.findAll()).thenReturn(List.of(interest));
+		when(s3BinaryStorage.getBackupArticles("경제", from)).thenReturn(List.of(dto1));
+		when(articleRepository.existsById(newId)).thenReturn(false);
+		when(articleRepository.findById(newId)).thenReturn(Optional.of(savedArticle));
+		when(interestRepository.findByName("경제")).thenReturn(List.of(interest));
+
+		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
 
 		assertThat(results).hasSize(1);
 		assertThat(results.get(0).restoredArticleCount()).isEqualTo(1);
-		verify(articleRepository).saveAll(anyList());
+		verify(articleRepository).insertIfNotExists(
+			eq(newId),
+			eq("NAVER"),
+			eq("http://test.com/1"),
+			eq("New Article"),
+			eq("Summary"),
+			eq(dto1.getPublishDate())
+		);
+		verify(articleInterestRepository).save(any(ArticleInterest.class));
 	}
 
 	@Test
@@ -954,34 +958,45 @@ class ArticleServiceTest {
 		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
 		LocalDateTime to = LocalDateTime.of(2025, 1, 2, 0, 0);
 
-		com.monew.monew_server.domain.article.dto.ArticleSaveDto dto1 =
-			com.monew.monew_server.domain.article.dto.ArticleSaveDto.builder()
-				.source(ArticleSource.NAVER)
-				.sourceUrl("http://test.com/1")
-				.title("Article 1")
-				.summary("Summary")
-				.publishDate(Instant.now())
-				.build();
+		Interest interest = Interest.builder().id(UUID.randomUUID()).name("경제").build();
+		UUID id1 = UUID.randomUUID();
+		UUID id2 = UUID.randomUUID();
 
-		com.monew.monew_server.domain.article.dto.ArticleSaveDto dto2 =
-			com.monew.monew_server.domain.article.dto.ArticleSaveDto.builder()
-				.source(ArticleSource.CHOSUN)
-				.sourceUrl("http://test.com/2")
-				.title("Article 2")
-				.summary("Summary")
-				.publishDate(Instant.now())
-				.build();
+		ArticleSaveDto dto1 = ArticleSaveDto.builder()
+			.id(id1)
+			.source(ArticleSource.NAVER)
+			.sourceUrl("http://test.com/1")
+			.title("Article 1")
+			.summary("Summary")
+			.publishDate(Instant.now())
+			.build();
 
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto1));
-		when(s3BinaryStorage.getBackupArticles(from.plusDays(1))).thenReturn(List.of(dto2));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
+		ArticleSaveDto dto2 = ArticleSaveDto.builder()
+			.id(id2)
+			.source(ArticleSource.CHOSUN)
+			.sourceUrl("http://test.com/2")
+			.title("Article 2")
+			.summary("Summary")
+			.publishDate(Instant.now())
+			.build();
 
-		List<com.monew.monew_server.domain.article.dto.ArticleRestoreResult> results =
-			articleService.restoreArticles(from, to);
+		Article article1 = Article.builder().id(id1).build();
+		Article article2 = Article.builder().id(id2).build();
+
+		when(interestRepository.findAll()).thenReturn(List.of(interest));
+		when(s3BinaryStorage.getBackupArticles("경제", from)).thenReturn(List.of(dto1));
+		when(s3BinaryStorage.getBackupArticles("경제", from.plusDays(1))).thenReturn(List.of(dto2));
+		when(articleRepository.existsById(any())).thenReturn(false);
+		when(articleRepository.findById(id1)).thenReturn(Optional.of(article1));
+		when(articleRepository.findById(id2)).thenReturn(Optional.of(article2));
+		when(interestRepository.findByName("경제")).thenReturn(List.of(interest));
+
+		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
 
 		assertThat(results).hasSize(2);
-		verify(articleRepository, times(2)).saveAll(anyList());
+		assertThat(results.get(0).restoredArticleCount()).isEqualTo(1);
+		assertThat(results.get(1).restoredArticleCount()).isEqualTo(1);
+		verify(articleRepository, times(2)).insertIfNotExists(any(), any(), any(), any(), any(), any());
 	}
 
 	@Test
@@ -990,26 +1005,21 @@ class ArticleServiceTest {
 		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
 		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
 
-		com.monew.monew_server.domain.article.dto.ArticleSaveDto newDto =
-			com.monew.monew_server.domain.article.dto.ArticleSaveDto.builder()
-				.source(ArticleSource.NAVER)
-				.sourceUrl("http://test.com/new")
-				.title("New Article")
-				.summary("Summary")
-				.publishDate(Instant.now())
-				.build();
+		Interest interest = Interest.builder().id(UUID.randomUUID()).name("경제").build();
+		UUID newId = UUID.randomUUID();
+		UUID existingId = UUID.randomUUID();
 
-		com.monew.monew_server.domain.article.dto.ArticleSaveDto existingDto =
-			com.monew.monew_server.domain.article.dto.ArticleSaveDto.builder()
-				.source(ArticleSource.CHOSUN)
-				.sourceUrl("http://test.com/existing")
-				.title("Existing Article")
-				.summary("Summary")
-				.publishDate(Instant.now())
-				.build();
+		ArticleSaveDto newDto = ArticleSaveDto.builder()
+			.id(newId)
+			.source(ArticleSource.NAVER)
+			.sourceUrl("http://test.com/new")
+			.title("New Article")
+			.summary("Summary")
+			.publishDate(Instant.now())
+			.build();
 
-		Article existingArticle = Article.builder()
-			.id(UUID.randomUUID())
+		ArticleSaveDto existingDto = ArticleSaveDto.builder()
+			.id(existingId)
 			.source(ArticleSource.CHOSUN)
 			.sourceUrl("http://test.com/existing")
 			.title("Existing Article")
@@ -1017,19 +1027,20 @@ class ArticleServiceTest {
 			.publishDate(Instant.now())
 			.build();
 
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(newDto, existingDto));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(List.of(existingArticle));
+		Article newArticle = Article.builder().id(newId).build();
 
-		List<com.monew.monew_server.domain.article.dto.ArticleRestoreResult> results =
-			articleService.restoreArticles(from, to);
+		when(interestRepository.findAll()).thenReturn(List.of(interest));
+		when(s3BinaryStorage.getBackupArticles("경제", from)).thenReturn(List.of(newDto, existingDto));
+		when(articleRepository.existsById(newId)).thenReturn(false);
+		when(articleRepository.existsById(existingId)).thenReturn(true);
+		when(articleRepository.findById(newId)).thenReturn(Optional.of(newArticle));
+		when(interestRepository.findByName("경제")).thenReturn(List.of(interest));
+
+		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
 
 		assertThat(results).hasSize(1);
 		assertThat(results.get(0).restoredArticleCount()).isEqualTo(1);
-		verify(articleRepository).saveAll(argThat(articles -> {
-			List<Article> list = (List<Article>)articles;
-			return list.size() == 1;
-		}));
+		verify(articleRepository, times(1)).insertIfNotExists(any(), any(), any(), any(), any(), any());
 	}
 
 	@Test
@@ -1248,44 +1259,6 @@ class ArticleServiceTest {
 	}
 
 	@Test
-	@DisplayName("getArticleById - entityManager에서 User 참조 가져오기")
-	void shouldGetUserReferenceFromEntityManager() {
-		Article article = Article.builder().id(ARTICLE_ID).build();
-		User user = User.builder().id(DUMMY_USER_ID).build();
-
-		when(articleRepositoryCustom.findArticleById(ARTICLE_ID)).thenReturn(Optional.of(article));
-		when(articleViewRepository.existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID))
-			.thenReturn(false)
-			.thenReturn(true);
-		when(entityManager.getReference(User.class, DUMMY_USER_ID)).thenReturn(user);
-		when(articleViewRepository.countByArticleId(ARTICLE_ID)).thenReturn(1L);
-		when(commentRepository.countByArticleId(ARTICLE_ID)).thenReturn(0L);
-		when(articleMapper.toResponse(article, 1L, 0L, true)).thenReturn(
-			new ArticleResponse(ARTICLE_ID, ArticleSource.NAVER, "url", "Title", Instant.now(), "Summary", 0L, 1L, true)
-		);
-
-		articleService.getArticleById(ARTICLE_ID, DUMMY_USER_ID);
-
-		verify(entityManager).getReference(User.class, DUMMY_USER_ID);
-		verify(articleViewRepository).save(any(ArticleView.class));
-	}
-
-	@Test
-	@DisplayName("addArticleView - userId가 null이 아니지만 빈 문자열도 아닐 때")
-	void shouldAddViewWhenUserIdIsValid() {
-		Article article = Article.builder().id(ARTICLE_ID).build();
-		User user = User.builder().id(DUMMY_USER_ID).build();
-
-		when(articleRepositoryCustom.findArticleById(ARTICLE_ID)).thenReturn(Optional.of(article));
-		when(articleViewRepository.existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID)).thenReturn(false);
-		when(entityManager.getReference(User.class, DUMMY_USER_ID)).thenReturn(user);
-
-		articleService.addArticleView(ARTICLE_ID, DUMMY_USER_ID);
-
-		verify(articleViewRepository).save(any(ArticleView.class));
-	}
-
-	@Test
 	@DisplayName("fetchArticles - totalElements가 0일 때도 정상 처리")
 	void shouldHandleZeroTotalElements() {
 		ArticleRequest request = new ArticleRequest(
@@ -1427,273 +1400,113 @@ class ArticleServiceTest {
 	}
 
 	@Test
-	@DisplayName("Service - restoreArticles에서 키워드 매칭으로 ArticleInterest 생성 확인")
-	void shouldCreateArticleInterestsBasedOnKeywordMatching() {
+	@DisplayName("Service - restoreArticles 여러 관심사 처리")
+	void shouldProcessMultipleInterests() {
 		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
 		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
 
 		Interest interest1 = Interest.builder().id(UUID.randomUUID()).name("경제").build();
-		Interest interest2 = Interest.builder().id(UUID.randomUUID()).name("기술").build();
+		Interest interest2 = Interest.builder().id(UUID.randomUUID()).name("IT").build();
 
-		InterestKeyword keyword1 = InterestKeyword.builder()
-			.id(UUID.randomUUID())
-			.interest(interest1)
-			.name("삼성전자")
-			.build();
-
-		InterestKeyword keyword2 = InterestKeyword.builder()
-			.id(UUID.randomUUID())
-			.interest(interest2)
-			.name("AI")
-			.build();
+		UUID id1 = UUID.randomUUID();
+		UUID id2 = UUID.randomUUID();
 
 		ArticleSaveDto dto1 = ArticleSaveDto.builder()
+			.id(id1)
 			.source(ArticleSource.NAVER)
 			.sourceUrl("http://test.com/1")
-			.title("삼성전자 실적 발표")
-			.summary("삼성전자가...")
+			.title("경제 뉴스")
+			.summary("Summary")
 			.publishDate(Instant.now())
 			.build();
 
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto1));
+		ArticleSaveDto dto2 = ArticleSaveDto.builder()
+			.id(id2)
+			.source(ArticleSource.CHOSUN)
+			.sourceUrl("http://test.com/2")
+			.title("IT 뉴스")
+			.summary("Summary")
+			.publishDate(Instant.now())
+			.build();
+
+		Article article1 = Article.builder().id(id1).build();
+		Article article2 = Article.builder().id(id2).build();
+
 		when(interestRepository.findAll()).thenReturn(List.of(interest1, interest2));
-		when(interestKeywordRepository.findByInterestIdIn(anyList()))
-			.thenReturn(List.of(keyword1, keyword2));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
-
-		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
-
-		verify(articleInterestRepository).saveAll(argThat(list -> {
-			List<ArticleInterest> interests = (List<ArticleInterest>)list;
-			return !interests.isEmpty();
-		}));
-	}
-
-	@Test
-	@DisplayName("Service - restoreArticles에서 대소문자 무관하게 키워드 매칭")
-	void shouldMatchKeywordsCaseInsensitively() {
-		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
-		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
-
-		Interest interest = Interest.builder().id(UUID.randomUUID()).name("IT").build();
-		InterestKeyword keyword = InterestKeyword.builder()
-			.id(UUID.randomUUID())
-			.interest(interest)
-			.name("Apple")
-			.build();
-
-		ArticleSaveDto dto = ArticleSaveDto.builder()
-			.source(ArticleSource.NAVER)
-			.sourceUrl("http://test.com/1")
-			.title("APPLE 신제품 출시")
-			.summary("apple watch...")
-			.publishDate(Instant.now())
-			.build();
-
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto));
-		when(interestRepository.findAll()).thenReturn(List.of(interest));
-		when(interestKeywordRepository.findByInterestIdIn(anyList())).thenReturn(List.of(keyword));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
-
-		articleService.restoreArticles(from, to);
-
-		verify(articleInterestRepository).saveAll(argThat(list -> {
-			List<ArticleInterest> interests = (List<ArticleInterest>)list;
-			return interests.size() > 0;
-		}));
-	}
-
-	@Test
-	@DisplayName("Service - restoreArticles에서 title이 null일 때 처리")
-	void shouldHandleNullTitleDuringRestore() {
-		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
-		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
-
-		Interest interest = Interest.builder().id(UUID.randomUUID()).name("IT").build();
-		InterestKeyword keyword = InterestKeyword.builder()
-			.id(UUID.randomUUID())
-			.interest(interest)
-			.name("테스트")
-			.build();
-
-		ArticleSaveDto dto = ArticleSaveDto.builder()
-			.source(ArticleSource.NAVER)
-			.sourceUrl("http://test.com/1")
-			.title(null)
-			.summary("테스트 내용")
-			.publishDate(Instant.now())
-			.build();
-
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto));
-		when(interestRepository.findAll()).thenReturn(List.of(interest));
-		when(interestKeywordRepository.findByInterestIdIn(anyList())).thenReturn(List.of(keyword));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
+		when(s3BinaryStorage.getBackupArticles("경제", from)).thenReturn(List.of(dto1));
+		when(s3BinaryStorage.getBackupArticles("IT", from)).thenReturn(List.of(dto2));
+		when(articleRepository.existsById(any())).thenReturn(false);
+		when(articleRepository.findById(id1)).thenReturn(Optional.of(article1));
+		when(articleRepository.findById(id2)).thenReturn(Optional.of(article2));
+		when(interestRepository.findByName("경제")).thenReturn(List.of(interest1));
+		when(interestRepository.findByName("IT")).thenReturn(List.of(interest2));
 
 		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
 
 		assertThat(results).hasSize(1);
-		verify(articleRepository).saveAll(anyList());
+		assertThat(results.get(0).restoredArticleCount()).isEqualTo(2);
+		verify(articleRepository, times(2)).insertIfNotExists(any(), any(), any(), any(), any(), any());
 	}
 
 	@Test
-	@DisplayName("Service - restoreArticles에서 summary가 null일 때 처리")
-	void shouldHandleNullSummaryDuringRestore() {
-		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
-		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
+	@DisplayName("Service - restoreArticles from과 to가 같은 날짜")
+	void shouldHandleSameDateForFromAndTo() {
+		LocalDateTime sameDate = LocalDateTime.of(2025, 1, 1, 0, 0);
 
-		Interest interest = Interest.builder().id(UUID.randomUUID()).name("IT").build();
-		InterestKeyword keyword = InterestKeyword.builder()
-			.id(UUID.randomUUID())
-			.interest(interest)
-			.name("테스트")
-			.build();
+		Interest interest = Interest.builder().id(UUID.randomUUID()).name("경제").build();
+		UUID articleId = UUID.randomUUID();
 
 		ArticleSaveDto dto = ArticleSaveDto.builder()
+			.id(articleId)
 			.source(ArticleSource.NAVER)
 			.sourceUrl("http://test.com/1")
-			.title("테스트 제목")
-			.summary(null)
+			.title("Article")
+			.summary("Summary")
 			.publishDate(Instant.now())
 			.build();
 
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto));
-		when(interestRepository.findAll()).thenReturn(List.of(interest));
-		when(interestKeywordRepository.findByInterestIdIn(anyList())).thenReturn(List.of(keyword));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
+		Article article = Article.builder().id(articleId).build();
 
-		List<ArticleRestoreResult> results = articleService.restoreArticles(from, to);
+		when(interestRepository.findAll()).thenReturn(List.of(interest));
+		when(s3BinaryStorage.getBackupArticles("경제", sameDate)).thenReturn(List.of(dto));
+		when(articleRepository.existsById(articleId)).thenReturn(false);
+		when(articleRepository.findById(articleId)).thenReturn(Optional.of(article));
+		when(interestRepository.findByName("경제")).thenReturn(List.of(interest));
+
+		List<ArticleRestoreResult> results = articleService.restoreArticles(sameDate, sameDate);
 
 		assertThat(results).hasSize(1);
-		verify(articleRepository).saveAll(anyList());
+		verify(s3BinaryStorage, times(1)).getBackupArticles(eq("경제"), any());
 	}
 
 	@Test
-	@DisplayName("Service - restoreArticles 여러 관심사와 매칭")
-	void shouldMatchMultipleInterests() {
-		LocalDateTime from = LocalDateTime.of(2025, 1, 1, 0, 0);
-		LocalDateTime to = LocalDateTime.of(2025, 1, 1, 0, 0);
-
-		Interest interest1 = Interest.builder().id(UUID.randomUUID()).name("IT").build();
-		Interest interest2 = Interest.builder().id(UUID.randomUUID()).name("경제").build();
-
-		InterestKeyword keyword1 = InterestKeyword.builder()
-			.id(UUID.randomUUID())
-			.interest(interest1)
-			.name("삼성")
-			.build();
-
-		InterestKeyword keyword2 = InterestKeyword.builder()
-			.id(UUID.randomUUID())
-			.interest(interest2)
-			.name("삼성")
-			.build();
-
-		ArticleSaveDto dto = ArticleSaveDto.builder()
-			.source(ArticleSource.NAVER)
-			.sourceUrl("http://test.com/1")
-			.title("삼성 실적")
-			.summary("내용")
-			.publishDate(Instant.now())
-			.build();
-
-		when(s3BinaryStorage.getBackupArticles(from)).thenReturn(List.of(dto));
-		when(interestRepository.findAll()).thenReturn(List.of(interest1, interest2));
-		when(interestKeywordRepository.findByInterestIdIn(anyList()))
-			.thenReturn(List.of(keyword1, keyword2));
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
-
-		articleService.restoreArticles(from, to);
-
-		verify(articleInterestRepository).saveAll(argThat(list -> {
-			List<ArticleInterest> interests = (List<ArticleInterest>)list;
-			return interests.size() == 2;
-		}));
-	}
-
-	@Test
-	@DisplayName("Service - parseSortType 'VIEW_COUNT' 대문자 입력")
-	void shouldMapUppercaseViewCount() {
+	@DisplayName("Service - fetchArticles viewedArticleIds가 비어있을 때")
+	void shouldHandleEmptyViewedArticleIds() {
+		UUID articleId = UUID.randomUUID();
 		Article article = Article.builder()
-			.id(UUID.randomUUID())
+			.id(articleId)
 			.source(ArticleSource.NAVER)
 			.publishDate(Instant.now())
 			.build();
 
 		ArticleRequest request = new ArticleRequest(
 			null, null, null, null, null,
-			"VIEW_COUNT", "DESC", null, null, 10
+			"DATE", "DESC", null, null, 10
 		);
 
 		when(articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 11))
 			.thenReturn(List.of(article));
 		when(articleRepositoryCustom.countArticlesWithFilter(request)).thenReturn(1L);
+		when(articleViewRepository.findArticleIdsViewedByUser(anyList(), any()))
+			.thenReturn(Collections.emptySet());
 		when(articleMapper.toResponseList(anyList())).thenReturn(List.of(
-			new ArticleResponse(article.getId(), ArticleSource.NAVER, "url", "Title",
-				article.getPublishDate(), "Summary", 0L, 0L, false)
+			new ArticleResponse(articleId, ArticleSource.NAVER, "url", "Title",
+				Instant.now(), "Summary", 0L, 0L, false)
 		));
 
 		CursorPageResponseArticleDto dto = articleService.fetchArticles(request, DUMMY_USER_ID);
 
-		assertThat(dto.getContent()).hasSize(1);
-	}
-
-	@Test
-	@DisplayName("Service - parseSortType 'COMMENT_COUNT' 대문자 입력")
-	void shouldMapUppercaseCommentCount() {
-		Article article = Article.builder()
-			.id(UUID.randomUUID())
-			.source(ArticleSource.NAVER)
-			.publishDate(Instant.now())
-			.build();
-
-		ArticleRequest request = new ArticleRequest(
-			null, null, null, null, null,
-			"COMMENT_COUNT", "DESC", null, null, 10
-		);
-
-		when(articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 11))
-			.thenReturn(List.of(article));
-		when(articleRepositoryCustom.countArticlesWithFilter(request)).thenReturn(1L);
-		when(articleMapper.toResponseList(anyList())).thenReturn(List.of(
-			new ArticleResponse(article.getId(), ArticleSource.NAVER, "url", "Title",
-				article.getPublishDate(), "Summary", 0L, 0L, false)
-		));
-
-		CursorPageResponseArticleDto dto = articleService.fetchArticles(request, DUMMY_USER_ID);
-
-		assertThat(dto.getContent()).hasSize(1);
-	}
-
-	@Test
-	@DisplayName("Service - parseSortType 'publishdate' 소문자 입력")
-	void shouldMapLowercasePublishdate() {
-		Article article = Article.builder()
-			.id(UUID.randomUUID())
-			.source(ArticleSource.NAVER)
-			.publishDate(Instant.now())
-			.build();
-
-		ArticleRequest request = new ArticleRequest(
-			null, null, null, null, null,
-			"publishdate", "DESC", null, null, 10
-		);
-
-		when(articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 11))
-			.thenReturn(List.of(article));
-		when(articleRepositoryCustom.countArticlesWithFilter(request)).thenReturn(1L);
-		when(articleMapper.toResponseList(anyList())).thenReturn(List.of(
-			new ArticleResponse(article.getId(), ArticleSource.NAVER, "url", "Title",
-				article.getPublishDate(), "Summary", 0L, 0L, false)
-		));
-
-		CursorPageResponseArticleDto dto = articleService.fetchArticles(request, DUMMY_USER_ID);
-
-		assertThat(dto.getContent()).hasSize(1);
+		assertThat(dto.getContent().get(0).viewedByMe()).isFalse();
 	}
 
 	@Test
@@ -1726,87 +1539,5 @@ class ArticleServiceTest {
 
 		assertThat(dto.getContent()).hasSize(50);
 		assertThat(dto.isHasNext()).isTrue();
-	}
-
-	@Test
-	@DisplayName("Service - addArticleView 콘솔 출력 확인용")
-	void shouldPrintUserIdInAddArticleView() {
-		Article article = Article.builder().id(ARTICLE_ID).build();
-
-		when(articleRepositoryCustom.findArticleById(ARTICLE_ID)).thenReturn(Optional.of(article));
-		when(articleViewRepository.existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID))
-			.thenReturn(true);
-
-		articleService.addArticleView(ARTICLE_ID, DUMMY_USER_ID);
-
-		verify(articleViewRepository, never()).save(any());
-	}
-
-	@Test
-	@DisplayName("Service - softDeleteArticle 콘솔 출력 확인용")
-	void shouldPrintEntityContainsInSoftDelete() {
-		Article article = Article.builder().id(ARTICLE_ID).build();
-
-		when(articleRepositoryCustom.findByIdAndDeletedAtIsNull(ARTICLE_ID))
-			.thenReturn(Optional.of(article));
-		when(entityManager.contains(article)).thenReturn(true);
-
-		articleService.softDeleteArticle(ARTICLE_ID);
-
-		verify(entityManager).contains(article);
-	}
-
-	@Test
-	@DisplayName("Service - restoreArticles from과 to가 같은 날짜")
-	void shouldHandleSameDateForFromAndTo() {
-		LocalDateTime sameDate = LocalDateTime.of(2025, 1, 1, 0, 0);
-
-		ArticleSaveDto dto = ArticleSaveDto.builder()
-			.source(ArticleSource.NAVER)
-			.sourceUrl("http://test.com/1")
-			.title("Article")
-			.summary("Summary")
-			.publishDate(Instant.now())
-			.build();
-
-		when(s3BinaryStorage.getBackupArticles(sameDate)).thenReturn(List.of(dto));
-		when(interestRepository.findAll()).thenReturn(Collections.emptyList());
-		when(articleRepository.findBySourceInAndSourceUrlIn(anyList(), anyList()))
-			.thenReturn(Collections.emptyList());
-
-		List<ArticleRestoreResult> results = articleService.restoreArticles(sameDate, sameDate);
-
-		assertThat(results).hasSize(1);
-		verify(s3BinaryStorage, times(1)).getBackupArticles(any());
-	}
-
-	@Test
-	@DisplayName("Service - fetchArticles viewedArticleIds가 비어있을 때")
-	void shouldHandleEmptyViewedArticleIds() {
-		UUID articleId = UUID.randomUUID();
-		Article article = Article.builder()
-			.id(articleId)
-			.source(ArticleSource.NAVER)
-			.publishDate(Instant.now())
-			.build();
-
-		ArticleRequest request = new ArticleRequest(
-			null, null, null, null, null,
-			"DATE", "DESC", null, null, 10
-		);
-
-		when(articleRepositoryCustom.findArticlesWithFilterAndCursor(request, 11))
-			.thenReturn(List.of(article));
-		when(articleRepositoryCustom.countArticlesWithFilter(request)).thenReturn(1L);
-		when(articleViewRepository.findArticleIdsViewedByUser(anyList(), any()))
-			.thenReturn(Collections.emptySet());
-		when(articleMapper.toResponseList(anyList())).thenReturn(List.of(
-			new ArticleResponse(articleId, ArticleSource.NAVER, "url", "Title",
-				Instant.now(), "Summary", 0L, 0L, false)
-		));
-
-		CursorPageResponseArticleDto dto = articleService.fetchArticles(request, DUMMY_USER_ID);
-
-		assertThat(dto.getContent().get(0).viewedByMe()).isFalse();
 	}
 }

@@ -8,6 +8,11 @@ spring:
     multipart:
       maxFileSize: 10MB
       maxRequestSize: 10MB
+  config:
+    import:
+      - "optional:classpath:application-local.yml" # 로컬 개발용
+      - "optional:classpath:application-prod.yml" # 프로덕션용
+      - "optional:aws-secretsmanager:${sm.secret.name:}"
 
 management:
   server:

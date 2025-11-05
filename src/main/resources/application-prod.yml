@@ -3,10 +3,6 @@ spring:
     activate:
       on-profile: prod
   aws:
-    apache-http:
-      connection-acquisition-timeout: 10000
-      max-connections: 100
-      socket-timeout: 10000
     accessKeyId: ${AWS_S3_ACCESS_KEY}
     secretKey: ${AWS_S3_SECRET_KEY}
     region: ${AWS_S3_REGION}
@@ -23,18 +19,17 @@ spring:
           management-base-url: ${MANAGEMENT_PUBLIC_URL:http://localhost:8081}
   datasource:
     driver-class-name: org.postgresql.Driver
-    url: jdbc:postgresql://${DB_PROD_HOST}/${DB_PROD_NAME}
-    username: ${DB_LOCAL_USER}
-    password: ${DB_LOCAL_PASSWORD}
+    url: jdbc:postgresql://${DB_PROD_HOST}:${DB_PROD_PORT}/${DB_PROD_NAME}
+    username: ${DB_PROD_USER}
+    password: ${DB_PROD_PASSWORD}
 
   data:
     mongodb:
-      uri: mongodb+srv://${DB_MONGO_USERNAME}:${DB_MONGO_PASSWORD}@monewcluster.1hw0geh.mongodb.net/${DB_MONGO_DB}?retryWrites=true&w=majority&appName=monewCluster
+      uri: ${PROD_MONGO_URI}
 
   jpa:
     hibernate:
       ddl-auto: validate
-    show-sql: true
     properties:
       hibernate:
         physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy

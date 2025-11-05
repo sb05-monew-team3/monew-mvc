@@ -2,7 +2,7 @@ name: Monew Server CI/CD
 
 on:
   push:
-    branches: [ "main" ] # main 브랜치에 푸시될 때 실행
+    branches: [ "main" ]
 
 jobs:
   build-and-deploy:
@@ -24,7 +24,7 @@ jobs:
       - name: Grant execute permission for gradlew
         run: chmod +x ./gradlew
 
-      # 4. Gradle 빌드 (Docker 이미지 빌드를 위해 .jar 파일 생성)
+      # 4. Gradle 빌드
       - name: Build with Gradle
         run: ./gradlew clean build -x test
 
@@ -48,7 +48,6 @@ jobs:
           ECR_REPO_URI: ${{ secrets.ECR_REPOSITORY_URI }}
           IMAGE_TAG: ${{ github.sha }}
         run: |
-          # ECR_REPO_URI 전체를 이미지 이름으로 사용합니다. (예: .../monew-server:8713...)
           docker build -t $ECR_REPO_URI:$IMAGE_TAG .
           echo "image_uri=$ECR_REPO_URI:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
@@ -56,21 +55,51 @@ jobs:
       - name: Push Docker image to ECR
         run: docker push ${{ steps.build-image.outputs.image_uri }}
 
-      # 9. CodeDeploy 배포 생성
+      # 9. CodeDeploy 배포 번들 생성
+      - name: Create CodeDeploy Deployment Bundle
+        run: |
+          mkdir -p deploy-bundle/scripts
+          cp appspec.yml deploy-bundle/
+          cp scripts/start_server.sh deploy-bundle/scripts/
+          cp scripts/stop_server.sh deploy-bundle/scripts/
+          # 이미지 URI를 텍스트 파일로 저장
+          echo "${{ steps.build-image.outputs.image_uri }}" > deploy-bundle/image_uri.txt
+          # deploy-bundle 디렉터리 내부의 파일들을 zip으로 압축
+          cd deploy-bundle
+          zip -r ../monew-server-deploy.zip .
+          cd ..
+
+      # 10. S3에 배포 번들 업로드
+      - name: Upload Deployment Bundle to S3
+        env:
+          S3_BUCKET: ${{ secrets.S3_BUCKET_FOR_CODEDEPLOY }}
+          S3_KEY: monew-server-deploy-${{ github.sha }}.zip
+        run: |
+          aws s3 cp monew-server-deploy.zip s3://$S3_BUCKET/$S3_KEY
+
+      # 11. CodeDeploy 배포 생성
       - name: Create CodeDeploy Deployment
         id: deploy
+        env:
+          S3_BUCKET: ${{ secrets.S3_BUCKET_FOR_CODEDEPLOY }}
+          S3_KEY: monew-server-deploy-${{ github.sha }}.zip
         run: |
+          # create-deployment의 JSON 출력을 DEPLOYMENT_OUTPUT_JSON 파일에 저장
           aws deploy create-deployment \
             --application-name ${{ secrets.CODEDEPLOY_APP_NAME }} \
             --deployment-group-name ${{ secrets.CODEDEPLOY_DEPLOYMENT_GROUP_NAME }} \
             --deployment-config-name CodeDeployDefault.OneAtATime \
             --description "Deployment from GitHub Actions ${{ github.sha }}" \
-            --s3-location bucket=${{ secrets.S3_BUCKET_FOR_CODEDEPLOY }},key=monew-server-deploy-${{ github.sha }}.zip,bundleType=zip \
-            --ignore-application-stop-failures \
-            --environment-variables '[{"name":"ECR_IMAGE_URI", "value":"${{ steps.build-image.outputs.image_uri }}", "type":"PLAINTEXT"}]'
+            --s3-location bucket=$S3_BUCKET,key=$S3_KEY,bundleType=zip \
+            --ignore-application-stop-failures > deployment-output.json
+          
+          # 파일에서 deploymentId를 파싱하여 GitHub Actions 출력 변수로 설정
+          DEPLOYMENT_ID=$(cat deployment-output.json | jq -r .deploymentId)
+          echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
-      # 10. CodeDeploy 배포 완료 대기
+      # 12. CodeDeploy 배포 완료 대기
       - name: Wait for CodeDeploy Deployment
         run: |
+          echo "Waiting for deployment: ${{ steps.deploy.outputs.deployment_id }}"
           aws deploy wait deployment-successful \
-            --deployment-id ${{ fromJson(steps.deploy.outputs.stdout).deploymentId }}
+            --deployment-id ${{ steps.deploy.outputs.deployment_id }}

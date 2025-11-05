@@ -37,6 +37,9 @@ monew-mvc/
  ┣ build.gradle
  ┗ README.md
 ```
+## 🔗ERD
+<img width="1777" height="968" alt="image" src="https://github.com/user-attachments/assets/0029923e-3429-4049-8238-bf55468070cc" />
+
 ## 🏛️시스템 아키텍쳐
 <img width="869" height="393" alt="image" src="https://github.com/user-attachments/assets/33481788-166e-4907-b6fd-96c7cc6fe172" />
 

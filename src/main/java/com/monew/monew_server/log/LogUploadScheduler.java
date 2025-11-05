@@ -17,7 +17,7 @@ public class LogUploadScheduler {
 
 	private final S3LogUploader s3LogUploader;
 
-	@Scheduled(cron = "0 0 0 * * *")
+	@Scheduled(cron = "0 0 2 * * *")
 	public void uploadYesterdayLog() {
 		log.info("전날 로그 S3 업로드 작업 시작");
 
@@ -31,7 +31,7 @@ public class LogUploadScheduler {
 		}
 	}
 
-	@Scheduled(cron = "0 0 0 * * SUN")
+	@Scheduled(cron = "0 0 3 * * SUN")
 	public void uploadOldLogs() {
 		log.info("오래된 로그 일괄 업로드 작업 시작");
 

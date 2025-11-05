@@ -78,7 +78,24 @@ jobs:
           cp appspec.yml deploy-bundle/
           cp scripts/start_server.sh deploy-bundle/scripts/
           cp scripts/stop_server.sh deploy-bundle/scripts/
+          
+          # 이미지 URI 파일 생성
           echo "${{ steps.build-image.outputs.image_uri }}" > deploy-bundle/image_uri.txt
+          
+          echo "환경 변수 파일 생성 중..."
+          cat <<EOF > deploy-bundle/scripts/env_vars.sh
+          #!/bin/bash
+          export DB_PROD_HOST=${{ env.DB_PROD_HOST }}
+          export DB_PROD_PORT=${{ env.DB_PROD_PORT }}
+          export DB_PROD_NAME=${{ env.DB_PROD_NAME }}
+          export DB_PROD_USER=${{ env.DB_PROD_USER }}
+          export DB_PROD_PASSWORD=${{ env.DB_PROD_PASSWORD }}
+          export PROD_MONGO_URI=${{ env.PROD_MONGO_URI }}
+          EOF
+          
+          echo "=== 번들 내용 확인 ==="
+          ls -R deploy-bundle
+          
           cd deploy-bundle
           zip -r ../monew-server-deploy.zip .
           cd ..

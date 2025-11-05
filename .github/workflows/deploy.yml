@@ -55,21 +55,35 @@ jobs:
       - name: Push Docker image to ECR
         run: docker push ${{ steps.build-image.outputs.image_uri }}
 
-      # 9. CodeDeploy 배포 번들 생성
+      # 9. Secrets Manager에서 DB 정보 가져오기
+      - name: Fetch Secrets from AWS Secrets Manager
+        id: fetch-secrets
+        run: |
+          SECRET_JSON=$(aws secretsmanager get-secret-value \
+            --secret-id prod/monew \
+            --region ${{ secrets.AWS_REGION }} \
+            --query SecretString --output text)
+
+          echo "DB_PROD_HOST=$(echo $SECRET_JSON | jq -r .DB_PROD_HOST)" >> $GITHUB_ENV
+          echo "DB_PROD_PORT=$(echo $SECRET_JSON | jq -r .DB_PROD_PORT)" >> $GITHUB_ENV
+          echo "DB_PROD_NAME=$(echo $SECRET_JSON | jq -r .DB_PROD_NAME)" >> $GITHUB_ENV
+          echo "DB_PROD_USER=$(echo $SECRET_JSON | jq -r .DB_PROD_USER)" >> $GITHUB_ENV
+          echo "DB_PROD_PASSWORD=$(echo $SECRET_JSON | jq -r .DB_PROD_PASSWORD)" >> $GITHUB_ENV
+          echo "PROD_MONGO_URI=$(echo $SECRET_JSON | jq -r .PROD_MONGO_URI)" >> $GITHUB_ENV
+
+      # 10. CodeDeploy 배포 번들 생성
       - name: Create CodeDeploy Deployment Bundle
         run: |
           mkdir -p deploy-bundle/scripts
           cp appspec.yml deploy-bundle/
           cp scripts/start_server.sh deploy-bundle/scripts/
           cp scripts/stop_server.sh deploy-bundle/scripts/
-          # 이미지 URI를 텍스트 파일로 저장
           echo "${{ steps.build-image.outputs.image_uri }}" > deploy-bundle/image_uri.txt
-          # deploy-bundle 디렉터리 내부의 파일들을 zip으로 압축
           cd deploy-bundle
           zip -r ../monew-server-deploy.zip .
           cd ..
 
-      # 10. S3에 배포 번들 업로드
+      # 11. S3에 배포 번들 업로드
       - name: Upload Deployment Bundle to S3
         env:
           S3_BUCKET: ${{ secrets.S3_BUCKET_FOR_CODEDEPY }}
@@ -77,7 +91,7 @@ jobs:
         run: |
           aws s3 cp monew-server-deploy.zip s3://$S3_BUCKET/$S3_KEY
 
-      # 11. CodeDeploy 배포 생성
+      # 12. CodeDeploy 배포 생성
       - name: Create CodeDeploy Deployment
         id: deploy
         env:
@@ -97,7 +111,7 @@ jobs:
           DEPLOYMENT_ID=$(cat deployment-output.json | jq -r .deploymentId)
           echo "deployment_id=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT
 
-      # 12. CodeDeploy 배포 완료 대기
+      # 13. CodeDeploy 배포 완료 대기
       - name: Wait for CodeDeploy Deployment
         run: |
           echo "Waiting for deployment: ${{ steps.deploy.outputs.deployment_id }}"

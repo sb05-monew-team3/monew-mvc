@@ -4,6 +4,15 @@ set -e
 APP_DIR="/home/ubuntu/app/monew-server"
 CONTAINER_NAME="monew-server"
 IMAGE_URI_FILE="$APP_DIR/image_uri.txt"
+ENV_FILE="$APP_DIR/scripts/env_vars.sh"
+
+if [ -f "$ENV_FILE" ]; then
+  echo "환경 변수 파일 로드: $ENV_FILE"
+  source $ENV_FILE
+else
+  echo "환경 변수 파일($ENV_FILE)을 찾을 수 없습니다."
+  exit 1
+fi
 
 TOKEN=$(curl -X PUT "http://169.254.169.254/latest/api/token" -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 
@@ -39,10 +48,13 @@ fi
 docker run -d \
   --name ${CONTAINER_NAME} \
   -p 8080:8080 \
-  -e "SPRING_PROFILES_ACTIVE=prod" \
-  --network host \
-  -v /home/ubuntu/.aws:/root/.aws \
-  -e AWS_REGION=${AWS_REGION} \
-  ${ECR_IMAGE_URI}
+  -e SPRING_PROFILES_ACTIVE=prod \
+  -e DB_PROD_HOST=$DB_PROD_HOST \
+  -e DB_PROD_PORT=$DB_PROD_PORT \
+  -e DB_PROD_NAME=$DB_PROD_NAME \
+  -e DB_PROD_USER=$DB_PROD_USER \
+  -e DB_PROD_PASSWORD=$DB_PROD_PASSWORD \
+  -e PROD_MONGO_URI=$PROD_MONGO_URI \
+  $ECR_IMAGE_URI
 
 echo "배포 완료"

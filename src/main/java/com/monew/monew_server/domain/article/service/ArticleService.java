@@ -1,5 +1,19 @@
 package com.monew.monew_server.domain.article.service;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.stereotype.Service;
+
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
 import com.monew.monew_server.domain.article.dto.ArticleRestoreResult;
@@ -24,27 +38,20 @@ import com.monew.monew_server.domain.interest.entity.InterestKeyword;
 import com.monew.monew_server.domain.interest.repository.InterestKeywordRepository;
 import com.monew.monew_server.domain.interest.repository.InterestRepository;
 import com.monew.monew_server.domain.user.entity.User;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.MUserActivityService;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.entity.MUserActivity;
 import com.monew.monew_server.exception.ArticleException;
+
 import jakarta.persistence.EntityManager;
 import jakarta.persistence.PersistenceContext;
 import jakarta.transaction.Transactional;
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Qualifier;
-import org.springframework.stereotype.Service;
 
 @Slf4j
 @Service
 public class ArticleService {
 
+	private static final int DEFAULT_PAGE_SIZE = 10;
 	private final ArticleRepository articleRepository;
 	private final ArticleRepositoryCustom articleRepositoryCustom;
 	private final ArticleMapper articleMapper;
@@ -54,6 +61,10 @@ public class ArticleService {
 	private final InterestRepository interestRepository;
 	private final ArticleInterestRepository articleInterestRepository;
 	private final InterestKeywordRepository interestKeywordRepository;
+	@Autowired
+	private MUserActivityService mUserActivityService;
+	@PersistenceContext
+	private EntityManager entityManager;
 
 	public ArticleService(
 		ArticleRepository articleRepository,
@@ -75,10 +86,6 @@ public class ArticleService {
 		this.interestKeywordRepository = interestKeywordRepository;
 	}
 
-	private static final int DEFAULT_PAGE_SIZE = 10;
-	@PersistenceContext
-	private EntityManager entityManager;
-
 	public CursorPageResponseArticleDto fetchArticles(ArticleRequest request, UUID currentUserId) {
 
 		int requestedSize = request.limit() != null ? request.limit() : DEFAULT_PAGE_SIZE;
@@ -98,7 +105,7 @@ public class ArticleService {
 
 		var commentCounts = commentRepository.findCommentCountsByArticleIds(articleIds)
 			.stream().collect(Collectors.toMap(CommentCountProjection::getArticleId,
-                CommentCountProjection::getCommentCount));
+				CommentCountProjection::getCommentCount));
 
 		List<ArticleResponse> enrichedResponses = allResponses.stream().map(resp ->
 			new ArticleResponse(
@@ -183,14 +190,40 @@ public class ArticleService {
 		Article article = articleRepositoryCustom.findArticleById(articleId)
 			.orElseThrow(ArticleException::new);
 
-		if (userId != null && !articleViewRepository.existsByArticleIdAndUserId(articleId, userId)) {
-			User userRef = entityManager.getReference(User.class, userId);
-			articleViewRepository.save(ArticleView.of(article, userRef));
+		boolean viewedByMe = false;
+
+		if (userId != null) {
+			viewedByMe = articleViewRepository.existsByArticleIdAndUserId(articleId, userId);
+
+			if (!viewedByMe) {
+				ArticleView saved = saveArticleViewToRdb(article, userId);
+			}
 		}
 
 		long viewCount = articleViewRepository.countByArticleId(articleId);
 		long commentCount = commentRepository.countByArticleId(articleId);
-		boolean viewedByMe = userId != null && articleViewRepository.existsByArticleIdAndUserId(articleId, userId);
+
+		return articleMapper.toResponse(article, viewCount, commentCount, viewedByMe);
+	}
+
+	@Transactional
+	public ArticleResponse getArticleByIdMongo(UUID articleId, UUID userId) {
+		Article article = articleRepositoryCustom.findArticleById(articleId)
+			.orElseThrow(ArticleException::new);
+
+		boolean viewedByMe = false;
+
+		if (userId != null) {
+			viewedByMe = articleViewRepository.existsByArticleIdAndUserId(articleId, userId);
+
+			if (!viewedByMe) {
+				ArticleView saved = saveArticleViewToRdb(article, userId);
+				addMongoArticleView(userId, saved);
+			}
+		}
+
+		long viewCount = articleViewRepository.countByArticleId(articleId);
+		long commentCount = commentRepository.countByArticleId(articleId);
 
 		return articleMapper.toResponse(article, viewCount, commentCount, viewedByMe);
 	}
@@ -210,7 +243,8 @@ public class ArticleService {
 
 		if (userId != null && !articleViewRepository.existsByArticleIdAndUserId(articleId, userId)) {
 			User userRef = entityManager.getReference(User.class, userId);
-			articleViewRepository.save(ArticleView.of(article, userRef));
+			ArticleView save = articleViewRepository.save(ArticleView.of(article, userRef));
+			addMongoArticleView(userId, save);
 		}
 	}
 
@@ -350,5 +384,28 @@ public class ArticleService {
 			current = current.plusDays(1);
 		}
 		return results;
+	}
+
+	// mongo
+	public void addMongoArticleView(UUID userId, ArticleView articleView) {
+		MUserActivity.ArticleView build = MUserActivity.ArticleView.builder()
+			.id(articleView.getId())
+			.viewedBy(userId)
+			.createdAt(articleView.getCreatedAt())
+			.articleId(articleView.getArticle().getId())
+			.source(articleView.getArticle().getSource().name())
+			.sourceUrl(articleView.getArticle().getSourceUrl())
+			.articleTitle(articleView.getArticle().getTitle())
+			.articlePublishedDate(articleView.getArticle().getPublishDate())
+			.articleSummary(articleView.getArticle().getSummary())
+			.articleCommentCount((int)commentRepository.countByArticleId(articleView.getArticle().getId()))
+			.articleViewCount((int)articleViewRepository.countByArticleId(articleView.getArticle().getId())).build();
+
+		mUserActivityService.addArticleView(userId, build);
+	}
+
+	private ArticleView saveArticleViewToRdb(Article article, UUID userId) {
+		User userRef = entityManager.getReference(User.class, userId);
+		return articleViewRepository.save(ArticleView.of(article, userRef));
 	}
 }

@@ -5,10 +5,12 @@ import java.util.UUID;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
+import com.monew.monew_server.domain.user_activity.service.DeNormalizeService;
 import com.monew.monew_server.domain.user_activity.service.UserActivityService;
 
 import lombok.RequiredArgsConstructor;
@@ -19,11 +21,24 @@ import lombok.RequiredArgsConstructor;
 public class UserActivityController {
 
 	private final UserActivityService userActivityService;
+	private final DeNormalizeService syncService;
 
 	// 사용자 정보 조회
 	@GetMapping("/{userId}")
 	public ResponseEntity<UserActivityDto> getUserActivity(@PathVariable UUID userId) {
 		UserActivityDto userActivity = userActivityService.getUserActivity(userId);
 		return ResponseEntity.ok(userActivity);
+	}
+
+	@GetMapping("/{userId}/mongo")
+	public ResponseEntity<UserActivityDto> getUserActivityMongo(@PathVariable UUID userId) {
+		UserActivityDto userActivity = userActivityService.getMongo(userId);
+		return ResponseEntity.ok(userActivity);
+	}
+
+	// 성능 측정용
+	@PostMapping("/sync-all")
+	public void syncAll() {
+		syncService.syncAllUsers();
 	}
 }

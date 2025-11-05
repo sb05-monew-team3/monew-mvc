@@ -1,27 +1,20 @@
 spring:
   config:
-    import: optional:dotenv:.env
     activate:
       on-profile: local
-  aws:
-    apache-http:
-      connection-acquisition-timeout: 10000
-      max-connections: 100
-      socket-timeout: 10000
-    accessKeyId: ${AWS_S3_ACCESS_KEY}
-    secretKey: ${AWS_S3_SECRET_KEY}
-    region: ${AWS_S3_REGION}
-    s3:
-      bucket: ${AWS_S3_BUCKET}
-  boot:
-    admin:
-      client:
-        enabled: false
-        url: http://localhost:9090
-        instance:
-          name: monew_server
-          service-url: http://localhost:8080
-          management-base-url: http://localhost:8081
+
+  cloud:
+    aws:
+      region:
+        static: ${AWS_S3_REGION}
+      credentials:
+        access-key: ${AWS_S3_ACCESS_KEY}
+        secret-key: ${AWS_S3_SECRET_KEY}
+
+  app:
+    aws:
+      s3:
+        bucket-name: ${AWS_S3_BUCKET}
 
   datasource:
     driver-class-name: org.postgresql.Driver
@@ -32,27 +25,7 @@ spring:
   data:
     mongodb:
       uri: mongodb://localhost:27017/monewDB
+
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
-    properties:
-      hibernate:
-        format_sql: true
-        highlight_sql: true
-        use_sql_comments: true
-        dialect: org.hibernate.dialect.PostgreSQLDialect
-        physical_naming_strategy: org.hibernate.boot.model.naming.CamelCaseToUnderscoresNamingStrategy
-        jdbc.time_zone: UTC
-    open-in-view: false
-
-logging:
-  level:
-    root: info
-    org.hibernate.SQL: info
-    org.hibernate.orm.jdbc.bind: info
-    org.hibernate.type.descriptor.sql: info
-
-    org.springframework.web: info
-    org.springframework.filter.CommonsRequestLoggingFilter: trace
-    com.monew.monew_server: info

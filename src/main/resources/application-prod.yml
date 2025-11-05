@@ -11,11 +11,10 @@ spring:
     aws:
       credentials:
         instance-profile: true
-
-  aws:
-    s3:
-      bucket: ${AWS_S3_BUCKET}
-
+  app:
+    aws:
+      s3:
+        bucket-name: ${AWS_S3_BUCKET}
 
   boot:
     admin:

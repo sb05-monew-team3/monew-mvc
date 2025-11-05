@@ -1,20 +1,18 @@
 package com.monew.monew_server.domain.article.storage;
 
-import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.stream.Collectors;
-
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.stereotype.Component;
-
 import com.fasterxml.jackson.databind.DeserializationFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
-
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Objects;
+import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import software.amazon.awssdk.core.ResponseInputStream;
 import software.amazon.awssdk.services.s3.S3Client;
 import software.amazon.awssdk.services.s3.model.GetObjectRequest;
@@ -29,7 +27,7 @@ public class S3BinaryStorage {
 
 	private final S3Client s3Client;
 
-	@Value("${spring.aws.s3.bucket}")
+	@Value("${spring.app.aws.s3.bucket-name}")
 	private String bucketName;
 
 	public List<ArticleSaveDto> getBackupArticles(LocalDateTime date) {
@@ -55,8 +53,8 @@ public class S3BinaryStorage {
 		objectMapper.configure(DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false);
 
 		return objects.stream()
-			.filter(obj -> !obj.key().endsWith("/"))
 			.map(S3Object::key)
+			.filter(key -> !key.endsWith("/"))
 			.map(key -> {
 				log.info("-> UUID 파일 로드: {}", key);
 				GetObjectRequest getRequest = GetObjectRequest.builder()
@@ -74,8 +72,7 @@ public class S3BinaryStorage {
 					return null;
 				}
 			})
-			.filter(dto -> dto != null)
+			.filter(Objects::nonNull)
 			.collect(Collectors.toList());
 	}
-
 }

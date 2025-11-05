@@ -70,6 +70,10 @@ jobs:
           echo "DB_PROD_USER=$(echo $SECRET_JSON | jq -r .DB_PROD_USER)" >> $GITHUB_ENV
           echo "DB_PROD_PASSWORD=$(echo $SECRET_JSON | jq -r .DB_PROD_PASSWORD)" >> $GITHUB_ENV
           echo "PROD_MONGO_URI=$(echo $SECRET_JSON | jq -r .PROD_MONGO_URI)" >> $GITHUB_ENV
+          echo "AWS_S3_ACCESS_KEY=$(echo $SECRET_JSON | jq -r .AWS_S3_ACCESS_KEY)" >> $GITHUB_ENV
+          echo "AWS_S3_SECRET_KEY=$(echo $SECRET_JSON | jq -r .AWS_S3_SECRET_KEY)" >> $GITHUB_ENV
+          echo "AWS_S3_REGION=$(echo $SECRET_JSON | jq -r .AWS_S3_REGION)" >> $GITHUB_ENV
+          echo "AWS_S3_BUCKET=$(echo $SECRET_JSON | jq -r .AWS_S3_BUCKET)" >> $GITHUB_ENV
 
       # 10. CodeDeploy 배포 번들 생성
       - name: Create CodeDeploy Deployment Bundle

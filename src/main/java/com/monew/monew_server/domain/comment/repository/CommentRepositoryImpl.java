@@ -8,13 +8,12 @@ import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Repository;
-
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.stereotype.Repository;
 
 @Slf4j
 @Repository
@@ -46,7 +45,7 @@ public class CommentRepositoryImpl implements CommentRepositoryCustom {
                         cursorCondition(comment, orderBy, direction, cursor, after)  // 커서 조건
                 )
                 .orderBy(getOrderSpecifier(comment, orderBy, direction))  // 동적 정렬 (요청 파라미터에 따라 정렬 조건 바꿔주는 것)
-                .limit(limit + 1);  // hasNext 판단을 위해 1개 더 조회
+                .limit(limit + 1L);  // hasNext 판단을 위해 1개 더 조회
 
         List<Comment> results = query.fetch();
 
@@ -108,7 +107,6 @@ public class CommentRepositoryImpl implements CommentRepositoryCustom {
 
     /**
      * likeCount 기준 커서 조건
-     *
      * <주의>
      * likeCount는 Comment 엔티티에 직접 저장되지 않고,
      * CommentLike 테이블을 COUNT 해야 함
@@ -129,7 +127,6 @@ public class CommentRepositoryImpl implements CommentRepositoryCustom {
 
     /**
      * 동적 정렬 조건 생성
-     *
      * <OrderSpecifier란?>
      * QueryDSL에서 ORDER BY 절을 표현하는 객체
      * - Order.ASC / Order.DESC: 정렬 방향

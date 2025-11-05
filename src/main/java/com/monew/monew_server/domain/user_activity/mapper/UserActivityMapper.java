@@ -1,17 +1,14 @@
 package com.monew.monew_server.domain.user_activity.mapper;
 
-import java.util.List;
-
-import org.mapstruct.Mapper;
-import org.mapstruct.Mapping;
-
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user_activity.dto.ArticleViewSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.CommentLikeSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.CommentSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.SubscriptionSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
-import com.monew.monew_server.domain.user_activity.dto.UserInfoDto;
+import java.util.List;
+import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 
 @Mapper(componentModel = "spring")
 public interface UserActivityMapper {
@@ -31,6 +28,4 @@ public interface UserActivityMapper {
 		List<CommentLikeSummaryDto> commentLikes,
 		List<ArticleViewSummaryDto> articleViews
 	);
-
-	UserInfoDto toUserInfoDto(User user);
 }

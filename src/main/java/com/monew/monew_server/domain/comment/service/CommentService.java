@@ -101,7 +101,14 @@ public class CommentService {
         Instant nextAfter = null;
         if (hasNext && !actualComments.isEmpty()) {
             Comment lastComment = actualComments.get(actualComments.size() - 1);
-            nextCursor = lastComment.getId().toString();
+
+            if ("likeCount".equalsIgnoreCase(orderBy)) {
+                Long likeCount = likeCountMap.getOrDefault(lastComment.getId(), 0L);
+                nextCursor = likeCount.toString();
+            } else {
+                nextCursor = lastComment.getCreatedAt().toString();
+            }
+
             nextAfter = lastComment.getCreatedAt();
         }
 

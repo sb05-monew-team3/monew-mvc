@@ -47,3 +47,8 @@ springdoc:
     init:
       encoding: UTF-8
 
+logging:
+  s3:
+    enabled: false
+    log-path: .logs
+    prefix: logs/

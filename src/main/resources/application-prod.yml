@@ -52,3 +52,8 @@ logging:
     org.springframework.filter.CommonsRequestLoggingFilter: warn
 
     com.monew.monew_server: info
+
+  s3:
+    enabled: true
+    bucket-name: ${AWS_S3_BUCKET}
+    prefix: logs/

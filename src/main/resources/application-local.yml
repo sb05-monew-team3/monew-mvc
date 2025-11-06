@@ -56,3 +56,8 @@ logging:
     org.springframework.web: info
     org.springframework.filter.CommonsRequestLoggingFilter: trace
     com.monew.monew_server: info
+
+  s3:
+    enabled: true
+    bucket-name: ${AWS_S3_BUCKET}
+    log-path: .logs

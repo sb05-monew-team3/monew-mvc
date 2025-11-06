@@ -1,12 +1,9 @@
 package com.monew.monew_server.domain.article.service;
 
 import java.time.LocalDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -59,7 +56,6 @@ public class ArticleService {
 
 	private final InterestRepository interestRepository;
 	private final ArticleInterestRepository articleInterestRepository;
-	private final InterestKeywordRepository interestKeywordRepository;
 	@Autowired
 	private MUserActivityService mUserActivityService;
 	@PersistenceContext
@@ -349,6 +345,8 @@ public class ArticleService {
 	private ArticleView saveArticleViewToRdb(Article article, UUID userId) {
 		User userRef = entityManager.getReference(User.class, userId);
 		return articleViewRepository.save(ArticleView.of(article, userRef));
+	}
+
 	private List<String> getInterestName() {
 		List<Interest> all = interestRepository.findAll();
 		if (all.isEmpty())

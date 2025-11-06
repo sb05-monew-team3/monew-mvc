@@ -45,13 +45,12 @@ FROM generate_series(1, 200) AS s(i);
 -- 4) ARTICLES (10,000개)
 INSERT INTO articles (id, source, source_url, title, publish_date, summary)
 SELECT uuid_generate_v4(),
-       (ARRAY['NAVER','HANKYUNG','CHOSUN','YEONHAP'])[floor(random()*4 + 1)],
+       ((ARRAY['NAVER','HANKYUNG','CHOSUN','YEONHAP'])[floor(random()*4 + 1)])::source,
        'https://example.com/article_' || i,
        'Article title ' || i,
        NOW() - (i || ' minutes')::interval,
        'Summary text for article ' || i
 FROM generate_series(1, 10000) AS s(i);
-
 -- 5) COMMENTS (20,000개)
 INSERT INTO comments (id, article_id, user_id, content)
 SELECT uuid_generate_v4(),

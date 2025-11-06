@@ -3,16 +3,10 @@ package com.monew.monew_server.domain.users.service;
 import static org.assertj.core.api.Assertions.*;
 import static org.mockito.BDDMockito.*;
 
-import com.monew.monew_server.domain.user.dto.UserDto;
-import com.monew.monew_server.domain.user.dto.UserLoginRequest;
-import com.monew.monew_server.domain.user.dto.UserRegisterRequest;
-import com.monew.monew_server.domain.user.dto.UserUpdateRequset;
-import com.monew.monew_server.domain.user.entity.User;
-import com.monew.monew_server.domain.user.repository.UserRepository;
-import com.monew.monew_server.domain.user.service.UserService;
 import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
+
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -22,8 +16,19 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
+import com.monew.monew_server.domain.user.dto.UserDto;
+import com.monew.monew_server.domain.user.dto.UserLoginRequest;
+import com.monew.monew_server.domain.user.dto.UserRegisterRequest;
+import com.monew.monew_server.domain.user.dto.UserUpdateRequset;
+import com.monew.monew_server.domain.user.entity.User;
+import com.monew.monew_server.domain.user.repository.UserRepository;
+import com.monew.monew_server.domain.user.service.UserService;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.MUserActivityService;
+
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
+	@Mock
+	private MUserActivityService userActivityService;
 
 	@Mock
 	private UserRepository userRepository;
@@ -53,7 +58,6 @@ class UserServiceTest {
 		@Test
 		@DisplayName("정상적으로 회원가입 성공")
 		void register_success() {
-			// given
 			UserRegisterRequest request = UserRegisterRequest.builder()
 				.email("test@email.com")
 				.nickname("tester")
@@ -63,10 +67,17 @@ class UserServiceTest {
 			given(userRepository.existsByEmail(request.getEmail())).willReturn(false);
 			given(userRepository.existsByNickname(request.getNickname())).willReturn(false);
 
-			// when
+			User saved = User.builder()
+				.id(UUID.randomUUID())
+				.email(request.getEmail())
+				.nickname(request.getNickname())
+				.password("encoded")
+				.build();
+
+			given(userRepository.save(any(User.class))).willReturn(saved);
+
 			userService.register(request);
 
-			// then
 			then(userRepository).should(times(1)).save(any(User.class));
 		}
 

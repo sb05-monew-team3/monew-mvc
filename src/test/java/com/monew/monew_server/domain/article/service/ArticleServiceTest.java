@@ -22,6 +22,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.mockito.junit.jupiter.MockitoSettings;
 import org.mockito.quality.Strictness;
+import org.springframework.test.util.ReflectionTestUtils;
 
 import com.monew.monew_server.domain.article.dto.ArticleRequest;
 import com.monew.monew_server.domain.article.dto.ArticleResponse;
@@ -44,6 +45,8 @@ import com.monew.monew_server.domain.interest.entity.ArticleInterest;
 import com.monew.monew_server.domain.interest.entity.Interest;
 import com.monew.monew_server.domain.interest.repository.InterestRepository;
 import com.monew.monew_server.domain.user.entity.User;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.MUserActivityService;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.entity.MUserActivity;
 import com.monew.monew_server.exception.ArticleException;
 
 import jakarta.persistence.EntityManager;
@@ -54,6 +57,9 @@ class ArticleServiceTest {
 
 	private final UUID DUMMY_USER_ID = UUID.randomUUID();
 	private final UUID ARTICLE_ID = UUID.randomUUID();
+
+	@Mock
+	private MUserActivityService mUserActivityService;
 	@Mock
 	private ArticleRepository articleRepository;
 	@Mock
@@ -93,6 +99,8 @@ class ArticleServiceTest {
 		} catch (NoSuchFieldException | IllegalAccessException e) {
 			throw new RuntimeException("Failed to inject EntityManager", e);
 		}
+		ReflectionTestUtils.setField(articleService, "entityManager", entityManager);
+		ReflectionTestUtils.setField(articleService, "mUserActivityService", mUserActivityService);
 
 		when(articleViewRepository.findViewCountsByArticleIds(anyList())).thenReturn(Collections.emptyList());
 		when(articleViewRepository.findArticleIdsViewedByUser(anyList(), any())).thenReturn(Collections.emptySet());
@@ -506,7 +514,6 @@ class ArticleServiceTest {
 	@DisplayName("Service - 이미 조회한 기사는 조회수 추가 안함")
 	void shouldNotAddViewWhenAlreadyViewed() {
 		Article article = Article.builder().id(ARTICLE_ID).build();
-
 		when(articleRepositoryCustom.findArticleById(ARTICLE_ID)).thenReturn(Optional.of(article));
 		when(articleViewRepository.existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID)).thenReturn(true);
 		when(articleViewRepository.countByArticleId(ARTICLE_ID)).thenReturn(1L);
@@ -517,7 +524,8 @@ class ArticleServiceTest {
 
 		articleService.getArticleById(ARTICLE_ID, DUMMY_USER_ID);
 
-		verify(articleViewRepository, times(2)).existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID);
+		// 1번만 호출되어야 함
+		verify(articleViewRepository, times(1)).existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID);
 		verify(articleViewRepository, never()).save(any());
 	}
 
@@ -582,16 +590,43 @@ class ArticleServiceTest {
 	@Test
 	@DisplayName("Service - 조회수 추가 - 새로운 조회면 저장")
 	void shouldSaveViewWhenNotViewedYet() {
-		Article article = Article.builder().id(ARTICLE_ID).build();
-		User user = User.builder().id(DUMMY_USER_ID).build();
+		// Given
+		Article article = Article.builder()
+			.id(ARTICLE_ID)
+			.source(ArticleSource.NAVER)
+			.sourceUrl("http://test.com")
+			.title("Test Title")
+			.summary("Test Summary")
+			.publishDate(Instant.now())
+			.build();
+
+		User user = User.builder()
+			.id(DUMMY_USER_ID)
+			.nickname("TestUser")
+			.build();
+
+		ArticleView articleView = ArticleView.of(article, user);
 
 		when(articleRepositoryCustom.findArticleById(ARTICLE_ID)).thenReturn(Optional.of(article));
 		when(articleViewRepository.existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID)).thenReturn(false);
 		when(entityManager.getReference(User.class, DUMMY_USER_ID)).thenReturn(user);
+		when(articleViewRepository.save(any(ArticleView.class))).thenReturn(articleView);
+		when(articleViewRepository.countByArticleId(ARTICLE_ID)).thenReturn(1L);
+		when(commentRepository.countByArticleId(ARTICLE_ID)).thenReturn(0L);
 
+		doNothing().when(mUserActivityService)
+			.addArticleView(eq(DUMMY_USER_ID), any(MUserActivity.ArticleView.class));
+
+		// When
 		articleService.addArticleView(ARTICLE_ID, DUMMY_USER_ID);
 
-		verify(articleViewRepository).save(any(ArticleView.class));
+		// Then
+		verify(articleRepositoryCustom, times(1)).findArticleById(ARTICLE_ID);
+		verify(articleViewRepository, times(1)).existsByArticleIdAndUserId(ARTICLE_ID, DUMMY_USER_ID);
+		verify(entityManager, times(1)).getReference(User.class, DUMMY_USER_ID);
+		verify(articleViewRepository, times(1)).save(any(ArticleView.class));
+		verify(mUserActivityService, times(1))
+			.addArticleView(eq(DUMMY_USER_ID), any(MUserActivity.ArticleView.class)); // ✅ 이 호출까지 검증
 	}
 
 	@Test

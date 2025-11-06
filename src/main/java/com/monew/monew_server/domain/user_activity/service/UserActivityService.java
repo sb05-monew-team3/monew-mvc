@@ -1,5 +1,11 @@
 package com.monew.monew_server.domain.user_activity.service;
 
+import java.util.List;
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.monew.monew_server.domain.article.entity.Article;
 import com.monew.monew_server.domain.interest.entity.InterestKeyword;
 import com.monew.monew_server.domain.user.entity.User;
@@ -10,19 +16,18 @@ import com.monew.monew_server.domain.user_activity.dto.CommentSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.SubscriptionSummaryDto;
 import com.monew.monew_server.domain.user_activity.dto.UserActivityDto;
 import com.monew.monew_server.domain.user_activity.mapper.UserActivityMapper;
-import com.monew.monew_server.domain.user_activity.repository.UserActivityArticleViewRepository;
-import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentLikeRepository;
-import com.monew.monew_server.domain.user_activity.repository.UserActivityCommentRepository;
-import com.monew.monew_server.domain.user_activity.repository.UserActivityInterestKeywordRepository;
-import com.monew.monew_server.domain.user_activity.repository.UserActivitySubscriptionRepository;
+import com.monew.monew_server.domain.user_activity.repository.jpa.UserActivityArticleViewRepository;
+import com.monew.monew_server.domain.user_activity.repository.jpa.UserActivityCommentLikeRepository;
+import com.monew.monew_server.domain.user_activity.repository.jpa.UserActivityCommentRepository;
+import com.monew.monew_server.domain.user_activity.repository.jpa.UserActivityInterestKeywordRepository;
+import com.monew.monew_server.domain.user_activity.repository.jpa.UserActivitySubscriptionRepository;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.entity.MUserActivity;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.repository.MUserActivityRepository;
 import com.monew.monew_server.exception.ErrorCode;
 import com.monew.monew_server.exception.UserActivityException;
-import java.util.List;
-import java.util.UUID;
+
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Service
@@ -37,18 +42,16 @@ public class UserActivityService {
 	private final UserActivityArticleViewRepository userActivityArticleViewRepository;
 	private final UserActivityInterestKeywordRepository userActivityInterestKeywordRepository;
 
-	/**
-	 * 사용자 전체 활동 조회
-	 */
+	private final MUserActivityRepository mUserActivityRepository;
 
 	@Transactional(readOnly = true)
 	public UserActivityDto getUserActivity(UUID userId) {
 		log.info("[UserActivityService] 사용자 활동 조회 요청 - userId={}", userId);
 
-    User user =
-        userRepository
-            .findById(userId)
-            .orElseThrow(() -> new UserActivityException(ErrorCode.USER_NOT_FOUND));
+		User user =
+			userRepository
+				.findById(userId)
+				.orElseThrow(() -> new UserActivityException(ErrorCode.USER_NOT_FOUND));
 
 		// 구독 중인 관심사 10개 조회
 		List<SubscriptionSummaryDto> subscriptions = userActivitySubscriptionRepository
@@ -106,7 +109,6 @@ public class UserActivityService {
 			.map(cl -> {
 				UUID commentId = cl.getComment().getId();
 
-
 				long likeCount = userActivityCommentLikeRepository.countByComment_Id(commentId);
 
 				return CommentLikeSummaryDto.builder()
@@ -148,10 +150,9 @@ public class UserActivityService {
 					.articleCommentCount(commentCount)
 					.articleViewCount(viewCount)
 					.build();
-				})
-				.toList();
+			})
+			.toList();
 		log.debug("[UserActivityService] 기사 조회 {}건 완료", articleViews.size());
-
 
 		UserActivityDto result = userActivityMapper.toDto(
 			user,
@@ -167,4 +168,13 @@ public class UserActivityService {
 
 		return result;
 	}
+
+	public UserActivityDto getMongo(UUID userId) {
+		MUserActivity mUserActivity = mUserActivityRepository.findByUserId(userId);
+		if (mUserActivity == null) {
+			throw new UserActivityException(ErrorCode.USER_NOT_FOUND);
+		}
+		return userActivityMapper.toDto(mUserActivity);
+	}
+
 }

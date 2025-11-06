@@ -1,5 +1,6 @@
 package com.monew.monew_server.domain.user.service;
 
+import java.time.Instant;
 import java.util.UUID;
 
 import org.springframework.stereotype.Service;
@@ -11,6 +12,8 @@ import com.monew.monew_server.domain.user.dto.UserRegisterRequest;
 import com.monew.monew_server.domain.user.dto.UserUpdateRequset;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.MUserActivityService;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.entity.MUserActivity;
 
 import lombok.RequiredArgsConstructor;
 
@@ -20,6 +23,7 @@ import lombok.RequiredArgsConstructor;
 public class UserService {
 
 	private final UserRepository userRepository;
+	private final MUserActivityService userActivityService;
 
 	public void register(UserRegisterRequest request) {
 		// 이메일 중복 검사
@@ -39,11 +43,13 @@ public class UserService {
 			.password(request.getPassword())
 			.build();
 
-		userRepository.save(user);
+		User savedUser = userRepository.save(user);
+		addMongoUser(savedUser.getId(), savedUser.getEmail(), savedUser.getNickname(), savedUser.getCreatedAt());
+
 	}
 
 	@Transactional(readOnly = true)
-	public UserDto login (UserLoginRequest request) {
+	public UserDto login(UserLoginRequest request) {
 		User user = userRepository.findByEmail(request.getEmail())
 			.orElseThrow(() -> new IllegalArgumentException("올바르지 않는 이메일입니다."));
 
@@ -51,7 +57,7 @@ public class UserService {
 			throw new IllegalArgumentException("존재하지 않는 사용자입니다.");
 		}
 
-		if (!user.getPassword().equals(request.getPassword())){
+		if (!user.getPassword().equals(request.getPassword())) {
 			throw new IllegalArgumentException("비밀번호가 올바르지 않습니다.");
 		}
 
@@ -64,7 +70,7 @@ public class UserService {
 	}
 
 	@Transactional
-	public UserDto updateNickname (UUID userId, UserUpdateRequset requset) {
+	public UserDto updateNickname(UUID userId, UserUpdateRequset requset) {
 		// 유저 존재 확인
 		User user = userRepository.findById(userId)
 			.orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자입니다."));
@@ -96,7 +102,7 @@ public class UserService {
 
 	@Transactional
 	public void deleteUser(UUID id) {
-		User user  = userRepository.findById(id)
+		User user = userRepository.findById(id)
 			.orElseThrow(() -> new IllegalArgumentException("존재하지 않는 사용자 입니다."));
 
 		if (user.getDeletedAt() != null) {
@@ -104,5 +110,10 @@ public class UserService {
 		}
 
 		user.softDelete();
+	}
+
+	// mongoDB용
+	public MUserActivity addMongoUser(UUID userId, String email, String nickname, Instant createdAt) {
+		return userActivityService.initializeUserActivity(userId, email, nickname, createdAt);
 	}
 }

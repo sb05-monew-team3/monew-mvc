@@ -1,5 +1,10 @@
 package com.monew.monew_server.domain.comment.service;
 
+import java.util.UUID;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import com.monew.monew_server.domain.comment.dto.CommentLikeDto;
 import com.monew.monew_server.domain.comment.entity.Comment;
 import com.monew.monew_server.domain.comment.entity.CommentLike;
@@ -8,91 +13,124 @@ import com.monew.monew_server.domain.comment.repository.CommentRepository;
 import com.monew.monew_server.domain.notification.service.NotificationService;
 import com.monew.monew_server.domain.user.entity.User;
 import com.monew.monew_server.domain.user.repository.UserRepository;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.MUserActivityService;
+import com.monew.monew_server.domain.user_activity.repository.mongodb.entity.MUserActivity;
 
-import jakarta.persistence.EntityManager;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import java.util.Optional;
-import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CommentLikeService {
 
-    private final CommentLikeRepository commentLikeRepository;
-    private final CommentRepository commentRepository;
-    private final EntityManager entityManager;
-    private final NotificationService notificationService;
+	private final CommentLikeRepository commentLikeRepository;
+	private final CommentRepository commentRepository;
+	private final NotificationService notificationService;
 	private final UserRepository userRepository;
+	private final MUserActivityService mUserActivityService;
 
-    @Transactional
-    public CommentLikeDto addLike(UUID commentId, UUID userId) {
-        log.info("좋아요 추가 요청: commentId={}, userId={}", commentId, userId);
+	@Transactional
+	public CommentLikeDto addLike(UUID commentId, UUID userId) {
+		log.info("좋아요 추가 요청: commentId={}, userId={}", commentId, userId);
 
-        // 1. 댓글이 존재하는지 확인
-        Comment comment = commentRepository.findById(commentId)
-                .orElseThrow(() -> new EntityNotFoundException("댓글을 찾을 수 없습니다: " + commentId));
+		// 1. 댓글이 존재하는지 확인
+		Comment comment = commentRepository.findById(commentId)
+			.orElseThrow(() -> new EntityNotFoundException("댓글을 찾을 수 없습니다: " + commentId));
 
-        // 2. 삭제된 댓글인지 체크
-        if (comment.isDeleted()) {
-            throw new IllegalStateException("삭제된 댓글에는 좋아요를 누를 수 없습니다.");
-        }
+		// 2. 삭제된 댓글인지 체크
+		if (comment.isDeleted()) {
+			throw new IllegalStateException("삭제된 댓글에는 좋아요를 누를 수 없습니다.");
+		}
 
-        // 3. 이미 좋아요를 눌렀는지 체크 (중복 방지)
-        if (commentLikeRepository.findByComment_IdAndUser_Id(commentId, userId).isPresent()) {
-            throw new IllegalStateException("이미 좋아요를 누른 댓글입니다.");
-        }
+		// 3. 이미 좋아요를 눌렀는지 체크 (중복 방지)
+		if (commentLikeRepository.findByComment_IdAndUser_Id(commentId, userId).isPresent()) {
+			throw new IllegalStateException("이미 좋아요를 누른 댓글입니다.");
+		}
 
-        // 4. User 객체 가져오기 (userId만 있으면 되니까 getReference 사용)
+		// 4. User 객체 가져오기 (userId만 있으면 되니까 getReference 사용)
 		User user = userRepository.findById(userId).orElseThrow();
 
 		// 5. CommentLike 엔티티 생성
-        CommentLike commentLike = CommentLike.builder()
-                .comment(comment)
-                .user(user)
-                .build();
+		CommentLike commentLike = CommentLike.builder()
+			.comment(comment)
+			.user(user)
+			.build();
 
-        // 6. DB에 저장
-        CommentLike savedLike = commentLikeRepository.save(commentLike);
-        log.info("좋아요 추가 완료: likeId={}", savedLike.getId());
+		// 6. DB에 저장
+		CommentLike savedLike = commentLikeRepository.save(commentLike);
+		log.info("좋아요 추가 완료: likeId={}", savedLike.getId());
+		saveMongoCommentLike(userId, savedLike);
 
-        // 7. 알림 생성 (댓글 작성자에게 알림 전송, 본인 체크는 NotificationService에서 처리)
-        notificationService.createCommentLikeNotification(comment, userId);
-        log.info("알림 생성 요청 완료: commentId={}, likedBy={}", comment.getId(), userId);
+		// 7. 알림 생성 (댓글 작성자에게 알림 전송, 본인 체크는 NotificationService에서 처리)
+		notificationService.createCommentLikeNotification(comment, userId);
+		log.info("알림 생성 요청 완료: commentId={}, likedBy={}", comment.getId(), userId);
 
-        // 8. 현재 좋아요 개수 조회
-        long likeCount = commentLikeRepository.countByComment_Id(commentId);
+		// 8. 현재 좋아요 개수 조회
+		long likeCount = commentLikeRepository.countByComment_Id(commentId);
 
-        // 9. 응답 DTO 생성 (Swagger 명세에 맞춰 댓글 정보도 함께 반환)
-        return CommentLikeDto.builder()
-                .id(savedLike.getId())
-                .likedBy(userId)
-                .createdAt(savedLike.getCreatedAt())
-                .commentId(comment.getId())
-                .articleId(comment.getArticle().getId())
-                .commentUserId(comment.getUser().getId())
-                .commentUserNickname(comment.getUser().getNickname())
-                .commentContent(comment.getContent())
-                .commentLikeCount(likeCount)
-                .commentCreatedAt(comment.getCreatedAt())
-                .build();
-    }
+		// 9. 응답 DTO 생성 (Swagger 명세에 맞춰 댓글 정보도 함께 반환)
+		return CommentLikeDto.builder()
+			.id(savedLike.getId())
+			.likedBy(userId)
+			.createdAt(savedLike.getCreatedAt())
+			.commentId(comment.getId())
+			.articleId(comment.getArticle().getId())
+			.commentUserId(comment.getUser().getId())
+			.commentUserNickname(comment.getUser().getNickname())
+			.commentContent(comment.getContent())
+			.commentLikeCount(likeCount)
+			.commentCreatedAt(comment.getCreatedAt())
+			.build();
+	}
 
-    @Transactional
-    public void removeLike(UUID commentId, UUID userId) {
-        log.info("좋아요 취소 요청: commentId={}, userId={}", commentId, userId);
+	@Transactional
+	public void removeLike(UUID commentId, UUID userId) {
+		log.info("좋아요 취소 요청: commentId={}, userId={}", commentId, userId);
 
-        // 1. 좋아요 찾기 (댓글ID + 유저ID로 조회)
-        CommentLike commentLike = commentLikeRepository.findByComment_IdAndUser_Id(commentId, userId)
-                .orElseThrow(() -> new EntityNotFoundException("좋아요를 찾을 수 없습니다."));
+		// 1. 좋아요 찾기 (댓글ID + 유저ID로 조회)
+		CommentLike commentLike = commentLikeRepository.findByComment_IdAndUser_Id(commentId, userId)
+			.orElseThrow(() -> new EntityNotFoundException("좋아요를 찾을 수 없습니다."));
 
-        // 2. DB에서 삭제
-        commentLikeRepository.delete(commentLike);
-        log.info("좋아요 취소 완료: commentId={}, userId={}", commentId, userId);
-    }
+		// 2. DB에서 삭제
+		commentLikeRepository.delete(commentLike);
+		log.info("좋아요 취소 완료: commentId={}, userId={}", commentId, userId);
+	}
+
+	/**
+	 * @Data
+	 *        @Builder
+	 *    public static class CommentLike {
+	 * 		private UUID id;
+	 * 		private Instant createdAt;
+	 * 		private UUID commentId;
+	 * 		private UUID articleId;
+	 * 		private String articleTitle;
+	 * 		private UUID commentUserId;
+	 * 		private String commentUserNickname;
+	 * 		private String commentContent;
+	 * 		private Integer commentLikeCount;
+	 * 		private Instant commentCreatedAt;
+	 */
+
+	public void saveMongoCommentLike(UUID userId, CommentLike commentLike) {
+
+		int count = (int)commentLikeRepository.countByComment_Id(commentLike.getComment().getId());
+
+		MUserActivity.CommentLike build = MUserActivity.CommentLike.builder()
+			.id(commentLike.getId())
+			.createdAt(commentLike.getCreatedAt())
+			.commentId(commentLike.getComment().getId())
+			.articleId(commentLike.getComment().getArticle().getId())
+			.articleTitle(commentLike.getComment().getArticle().getTitle())
+			.commentUserId(commentLike.getComment().getUser().getId())
+			.commentUserNickname(commentLike.getComment().getUser().getNickname())
+			.commentContent(commentLike.getComment().getContent())
+			.commentLikeCount(count)
+			.commentCreatedAt(commentLike.getComment().getCreatedAt())
+			.build();
+
+		mUserActivityService.addCommentLike(userId, build);
+	}
 }

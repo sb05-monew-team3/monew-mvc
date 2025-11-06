@@ -30,9 +30,8 @@ import lombok.extern.slf4j.Slf4j;
 @RequestMapping("/api/articles")
 public class ArticleController {
 
-	private final ArticleService articleService;
-
 	private static final String USER_ID_HEADER = "Monew-Request-User-ID";
+	private final ArticleService articleService;
 
 	private UUID getUserIdFromHeader(String userIdHeader) {
 		if (userIdHeader == null || userIdHeader.isBlank()) {
@@ -81,6 +80,18 @@ public class ArticleController {
 
 	@GetMapping("/{articleId}")
 	public ResponseEntity<ArticleResponse> getArticleById(
+		@PathVariable UUID articleId,
+		@RequestHeader(value = USER_ID_HEADER, required = false) String userIdHeader
+	) {
+		UUID userId = getUserIdFromHeader(userIdHeader);
+		log.info("GET /api/articles/{} - (사용자 ID: {})", articleId, userId);
+
+		ArticleResponse response = articleService.getArticleById(articleId, userId);
+		return ResponseEntity.ok(response);
+	}
+
+	@GetMapping("/{articleId}/mongo")
+	public ResponseEntity<ArticleResponse> getArticleByIdMongo(
 		@PathVariable UUID articleId,
 		@RequestHeader(value = USER_ID_HEADER, required = false) String userIdHeader
 	) {

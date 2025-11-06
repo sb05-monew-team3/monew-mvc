@@ -11,6 +11,7 @@ import com.monew.monew_server.domain.article.dto.ArticleSaveDto;
 import com.monew.monew_server.domain.common.BaseDeletableEntity;
 import com.monew.monew_server.domain.interest.entity.ArticleInterest;
 
+import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
@@ -44,6 +45,7 @@ public class Article extends BaseDeletableEntity {
 
 	private String title;
 
+	@Column(name = "summary", columnDefinition = "TEXT")
 	private String summary;
 	private Instant publishDate;
 	@Transient

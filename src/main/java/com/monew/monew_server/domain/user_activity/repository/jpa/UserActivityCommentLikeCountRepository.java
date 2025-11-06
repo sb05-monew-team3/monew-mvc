@@ -1,4 +1,4 @@
-package com.monew.monew_server.domain.user_activity.repository;
+package com.monew.monew_server.domain.user_activity.repository.jpa;
 
 import java.util.UUID;
 
@@ -9,5 +9,5 @@ import com.monew.monew_server.domain.comment.entity.CommentLike;
 
 @Repository
 public interface UserActivityCommentLikeCountRepository extends JpaRepository<CommentLike, UUID> {
-	
+
 }

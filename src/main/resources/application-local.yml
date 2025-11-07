@@ -28,6 +28,12 @@ spring:
     url: jdbc:postgresql://localhost:${DB_LOCAL_PORT:5432}/${DB_LOCAL_DB_NAME:monew}
     username: ${DB_LOCAL_USER:postgres}
     password: ${DB_LOCAL_PASSWORD:1234}
+    hikari:
+      maximum-pool-size: 30     # 기본 10 → 30 정도로
+      minimum-idle: 5
+      connection-timeout: 30000 # 30초
+      max-lifetime: 1800000     # 30분
+      idle-timeout: 600000      # 10분
 
   data:
     mongodb:
@@ -35,7 +41,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: false
